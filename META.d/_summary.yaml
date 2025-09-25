@@ -1,0 +1,8 @@
+---
+schema: 1.1
+
+summary:
+  owner: unionai
+  description: |
+    Union.ai Terraform provider
+  visibility: public
