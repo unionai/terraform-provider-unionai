@@ -4,18 +4,6 @@ resource "unionai_user" "nelson" {
   email      = "nelson@union.ai"
 }
 
-resource "unionai_user" "chris" {
-  first_name = "Chris"
-  last_name  = "M"
-  email      = "c@union.ai"
-}
-
-resource "unionai_user" "ketan" {
-  first_name = "Ketan"
-  last_name  = "U"
-  email      = "ketan@union.ai"
-}
-
 resource "unionai_project" "nelson" {
   name        = "nelson"
   description = "Nelson's Playground"
@@ -30,7 +18,7 @@ resource "unionai_role" "admin" {
   ]
 }
 
-resource "unionai_policy" "project1" {
+resource "unionai_policy" "project1_admins" {
   name = "project-1-admins"
 
   role {
@@ -52,5 +40,5 @@ resource "unionai_policy" "project1" {
 
 resource "unionai_policy_binding" "nelson" {
   user   = unionai_user.nelson.id
-  policy = unionai_policy.project1.id
+  policy = unionai_policy.project1_admins.id
 }
