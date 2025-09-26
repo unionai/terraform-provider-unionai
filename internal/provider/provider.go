@@ -5,8 +5,6 @@ import (
 	"net/http"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
-	"github.com/hashicorp/terraform-plugin-framework/ephemeral"
-	"github.com/hashicorp/terraform-plugin-framework/function"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -15,8 +13,6 @@ import (
 
 // Ensure UnionProvider satisfies various provider interfaces.
 var _ provider.Provider = &UnionaiProvider{}
-var _ provider.ProviderWithFunctions = &UnionaiProvider{}
-var _ provider.ProviderWithEphemeralResources = &UnionaiProvider{}
 
 // UnionaiProvider defines the provider implementation.
 type UnionaiProvider struct {
@@ -75,10 +71,6 @@ func (p *UnionaiProvider) Resources(ctx context.Context) []func() resource.Resou
 	}
 }
 
-func (p *UnionaiProvider) EphemeralResources(ctx context.Context) []func() ephemeral.EphemeralResource {
-	return []func() ephemeral.EphemeralResource{}
-}
-
 func (p *UnionaiProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		NewProjectDataSource,
@@ -87,10 +79,6 @@ func (p *UnionaiProvider) DataSources(ctx context.Context) []func() datasource.D
 		NewPolicyDataSource,
 		NewPolicyBindingDataSource,
 	}
-}
-
-func (p *UnionaiProvider) Functions(ctx context.Context) []func() function.Function {
-	return []func() function.Function{}
 }
 
 func New(version string) func() provider.Provider {
