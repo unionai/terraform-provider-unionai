@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
@@ -25,6 +24,10 @@ type UnionaiProvider struct {
 // UnionaiProviderModel describes the provider data model.
 type UnionaiProviderModel struct {
 	ApiKey types.String `tfsdk:"api_key"`
+}
+
+type providerData struct {
+	myNumber int
 }
 
 func (p *UnionaiProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -55,10 +58,10 @@ func (p *UnionaiProvider) Configure(ctx context.Context, req provider.ConfigureR
 	// Configuration values are now available.
 	// if data.Endpoint.IsNull() { /* ... */ }
 
-	// Example client configuration for data sources and resources
-	client := http.DefaultClient
-	resp.DataSourceData = client
-	resp.ResourceData = client
+	config := providerData{
+		myNumber: 7890,
+	}
+	resp.ResourceData = config
 }
 
 func (p *UnionaiProvider) Resources(ctx context.Context) []func() resource.Resource {

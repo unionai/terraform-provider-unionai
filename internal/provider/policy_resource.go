@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"fmt"
-	"net/http"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -12,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/unionai/cloud/gen/pb-go/authorizer"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -19,12 +19,28 @@ var _ resource.Resource = &PolicyResource{}
 var _ resource.ResourceWithImportState = &PolicyResource{}
 
 func NewPolicyResource() resource.Resource {
+	// var client authorizer.AuthorizerServiceClient
+
+	// conn, err := grpc.NewClient("XXXXXX", grpc.WithTransportCredentials(transportCreds))
+	// if err != nil {
+	// 	panic(fmt.Sprintf("failed to create gRPC client connection: %v", err))
+	// }
+
+	// client = authorizer.NewAuthorizerServiceClient(conn)
+
+	// ctx := context.Background()
+	// resp, err := client.ListPolicies(ctx, &authorizer.ListPoliciesRequest{
+	// 	Organization: "XXXXXX",
+	// })
+
+	// fmt.Println(client)
+
 	return &PolicyResource{}
 }
 
 // PolicyResource defines the resource implementation.
 type PolicyResource struct {
-	client *http.Client
+	client authorizer.AuthorizerServiceClient
 }
 
 // PolicyResourceModel describes the resource data model.
@@ -104,18 +120,20 @@ func (r *PolicyResource) Configure(ctx context.Context, req resource.ConfigureRe
 		return
 	}
 
-	client, ok := req.ProviderData.(*http.Client)
+	data, ok := req.ProviderData.(providerData)
 
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected *http.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+			fmt.Sprintf("Expected *providerData, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 
 		return
 	}
 
-	r.client = client
+	resp.Diagnostics.AddError(fmt.Sprintf("XXXXX = %d", data.myNumber), "NADA")
+
+	r.client = nil
 }
 
 func (r *PolicyResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
