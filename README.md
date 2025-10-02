@@ -10,6 +10,9 @@ Configure the provider by setting the following parameters:
       client_secret = "<your-client-secret-goes-here>"
     }
 
+You can also use the environment variables `UNIONAI_HOST`, `UNIONAI_CLIENT_ID`,
+and `UNIONAI_CLIENT_SECRET` to provide the values above.
+
 ## Credentials
 
 As Terraform runs unattended and will not have access to the browser, you need a
