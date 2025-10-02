@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"fmt"
-	"net/http"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -24,7 +23,6 @@ func NewPolicyBindingResource() resource.Resource {
 
 // PolicyBindingResource defines the resource implementation.
 type PolicyBindingResource struct {
-	client *http.Client
 }
 
 // PolicyBindingResourceModel describes the resource data model.
@@ -69,18 +67,16 @@ func (r *PolicyBindingResource) Configure(ctx context.Context, req resource.Conf
 		return
 	}
 
-	client, ok := req.ProviderData.(*http.Client)
+	_, ok := req.ProviderData.(*providerContext)
 
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected *http.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+			fmt.Sprintf("Expected *providerContext, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 
 		return
 	}
-
-	r.client = client
 }
 
 func (r *PolicyBindingResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {

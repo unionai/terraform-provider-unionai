@@ -7,6 +7,9 @@ terraform {
   }
 }
 
+# You can also specify environment variables UNIONAI_HOST, UNIONAI_CLIENT_ID, UNIONAI_CLIENT_SECRET
 provider "unionai" {
-  api_key = "<your-api-key-goes-here>"
+  host          = "<your-host-name-goes-here>"
+  client_id     = "<your-client-id-goes-here>"
+  client_secret = "<your-client-secret-goes-here>"
 }

@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"fmt"
-	"net/http"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -20,7 +19,6 @@ func NewProjectDataSource() datasource.DataSource {
 
 // ProjectDataSource defines the data source implementation.
 type ProjectDataSource struct {
-	client *http.Client
 }
 
 // ProjectDataSourceModel describes the data source data model.
@@ -40,7 +38,7 @@ func (d *ProjectDataSource) Schema(ctx context.Context, req datasource.SchemaReq
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				MarkdownDescription: "Project identifier",
-				Computed:            true,
+				Required:            true,
 			},
 		},
 	}
@@ -52,18 +50,15 @@ func (d *ProjectDataSource) Configure(ctx context.Context, req datasource.Config
 		return
 	}
 
-	client, ok := req.ProviderData.(*http.Client)
+	_, ok := req.ProviderData.(*providerContext)
 
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Data Source Configure Type",
-			fmt.Sprintf("Expected *http.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+			fmt.Sprintf("Expected *providerContext, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
-
 		return
 	}
-
-	d.client = client
 }
 
 func (d *ProjectDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
