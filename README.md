@@ -13,6 +13,7 @@ Configure the provider by setting the following parameters:
 You can also use the environment variables `UNIONAI_HOST`, `UNIONAI_CLIENT_ID`,
 and `UNIONAI_CLIENT_SECRET` to provide the values above.
 
+
 ## Credentials
 
 As Terraform runs unattended and will not have access to the browser, you need a
@@ -26,6 +27,38 @@ creating your application:
 
     responseTypes:
       - TOKEN
+
+1. Create an application definition file, e.g., `myapp.yaml`
+
+    clientId: <your-client-id>
+    clientName: <your-client-name>
+    clientUri: https://dummyclienturi
+    grantTypes:
+      - AUTHORIZATION_CODE
+      - CLIENT_CREDENTIALS
+      - IMPLICIT
+    logoUri: https://logouri
+    policyUri: https://dummypolicyuri
+    redirectUris:
+      - https://dummy/callback
+    responseTypes:
+      - CODE
+      - TOKEN
+    tokenEndpointAuthMethod: CLIENT_SECRET_POST
+    tosUri: https://dummytosuri
+
+   > All the fields that has `dummy` in its value are not used by the non-Web
+   > applications, yet they are required fields by the OIDC provider. It is up
+   > to you to have valid URLs or not. One good use for real URLs would be the
+   > case you want someone looking at the app details, e.g. with `uctl get
+   > oauth-app -o yaml`.
+
+2. Invoke `uctl` to create the client ID and secret:
+
+       uctl create oauth-app --appSpec myapp.yaml
+
+3. Input the `host`, `client_id`, and `client_secret` into the provider section.
+
 
 ## Developer Setup
 
@@ -41,10 +74,12 @@ creating your application:
 
         $ git clone git@github.com:unionai/cloud
 
+
 ## Building
 
     $ cd unionai-terraform-provider
     $ go build
+
 
 ## Test the provider
 
