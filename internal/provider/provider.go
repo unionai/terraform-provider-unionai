@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"crypto/tls"
-	"fmt"
 	"os"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -11,7 +10,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/oauth"
@@ -27,9 +25,7 @@ type UnionaiProvider struct {
 
 // UnionaiProviderModel describes the provider data model.
 type UnionaiProviderModel struct {
-	ClientID     types.String `tfsdk:"client_id"`
-	ClientSecret types.String `tfsdk:"client_secret"`
-	Host         types.String `tfsdk:"host"`
+	ApiKey types.String `tfsdk:"api_key"`
 }
 
 type providerContext struct {
@@ -44,17 +40,9 @@ func (p *UnionaiProvider) Metadata(ctx context.Context, req provider.MetadataReq
 func (p *UnionaiProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			"client_id": schema.StringAttribute{
-				MarkdownDescription: "OAuth client identifier",
-				Optional:            true, // they can be specified by UNIONAI_CLIENT_ID
-			},
-			"client_secret": schema.StringAttribute{
-				MarkdownDescription: "OAuth client secret",
-				Optional:            true, // they can be specified by UNIONAI_CLIENT_SECRET
-			},
-			"host": schema.StringAttribute{
-				MarkdownDescription: "Unionai host",
-				Optional:            true, // they can be specified by UNIONAI_HOST
+			"api_key": schema.StringAttribute{
+				MarkdownDescription: "Unionai API key",
+				Optional:            true, // they can be specified by UNIONAI_API_KEY
 			},
 		},
 	}
@@ -69,45 +57,20 @@ func (p *UnionaiProvider) Configure(ctx context.Context, req provider.ConfigureR
 		return
 	}
 
-	host := os.Getenv("UNIONAI_HOST")
-	if host == "" {
-		host = data.Host.ValueString()
+	apiKey := os.Getenv("UNIONAI_API_KEY")
+	if apiKey == "" {
+		apiKey = data.ApiKey.ValueString()
 	}
-	if host == "" {
+	if apiKey == "" {
 		resp.Diagnostics.AddError(
-			"Union.ai host is required",
-			"Union.ai host can be specified by UNIONAI_HOST or host attribute.",
+			"Union.ai api_key is required",
+			"Union.ai api_key can be specified by UNIONAI_API_KEY or api_key attribute.",
 		)
 		return
 	}
-	tflog.Trace(ctx, fmt.Sprintf("host: %s", host))
-	clientId := os.Getenv("UNIONAI_CLIENT_ID")
-	if clientId == "" {
-		clientId = data.ClientID.ValueString()
-	}
-	if clientId == "" {
-		resp.Diagnostics.AddError(
-			"Union.ai client_id is required",
-			"Union.ai client_id can be specified by UNIONAI_CLIENT_ID or client_id attribute.",
-		)
-		return
-	}
-	tflog.Trace(ctx, fmt.Sprintf("client_id: %s", clientId))
-	clientSecret := os.Getenv("UNIONAI_CLIENT_SECRET")
-	if clientSecret == "" {
-		clientSecret = data.ClientSecret.ValueString()
-	}
-	if clientSecret == "" {
-		resp.Diagnostics.AddError(
-			"Union.ai client_secret is required",
-			"Union.ai client_secret can be specified by UNIONAI_CLIENT_SECRET or client_secret attribute.",
-		)
-		return
-	}
-	tflog.Trace(ctx, fmt.Sprintf("client_secret: %s", clientSecret))
 
 	// Get OAuth2 token source using OpenID configuration
-	token, err := GetApiToken(host, clientId, clientSecret)
+	token, host, err := GetApiToken(apiKey)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get OAuth2 token", err.Error())
 		return
@@ -115,7 +78,7 @@ func (p *UnionaiProvider) Configure(ctx context.Context, req provider.ConfigureR
 
 	// Create gRPC connection with OAuth2 credentials
 	conn, err := grpc.NewClient(
-		host,
+		*host,
 		grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{})),
 		grpc.WithPerRPCCredentials(oauth.TokenSource{TokenSource: token}),
 	)
