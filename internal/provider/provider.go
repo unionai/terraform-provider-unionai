@@ -2,13 +2,17 @@ package provider
 
 import (
 	"context"
-	"net/http"
+	"crypto/tls"
+	"os"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/oauth"
 )
 
 // Ensure UnionProvider satisfies various provider interfaces.
@@ -16,15 +20,16 @@ var _ provider.Provider = &UnionaiProvider{}
 
 // UnionaiProvider defines the provider implementation.
 type UnionaiProvider struct {
-	// version is set to the provider version on release, "dev" when the
-	// provider is built and ran locally, and "test" when running acceptance
-	// testing.
 	version string
 }
 
 // UnionaiProviderModel describes the provider data model.
 type UnionaiProviderModel struct {
 	ApiKey types.String `tfsdk:"api_key"`
+}
+
+type providerContext struct {
+	conn *grpc.ClientConn
 }
 
 func (p *UnionaiProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -36,8 +41,8 @@ func (p *UnionaiProvider) Schema(ctx context.Context, req provider.SchemaRequest
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"api_key": schema.StringAttribute{
-				MarkdownDescription: "API key for authentication",
-				Required:            true,
+				MarkdownDescription: "Unionai API key",
+				Optional:            true, // they can be specified by UNIONAI_API_KEY
 			},
 		},
 	}
@@ -52,11 +57,39 @@ func (p *UnionaiProvider) Configure(ctx context.Context, req provider.ConfigureR
 		return
 	}
 
-	// Configuration values are now available.
-	// if data.Endpoint.IsNull() { /* ... */ }
+	apiKey := os.Getenv("UNIONAI_API_KEY")
+	if apiKey == "" {
+		apiKey = data.ApiKey.ValueString()
+	}
+	if apiKey == "" {
+		resp.Diagnostics.AddError(
+			"Union.ai api_key is required",
+			"Union.ai api_key can be specified by UNIONAI_API_KEY or api_key attribute.",
+		)
+		return
+	}
 
-	// Example client configuration for data sources and resources
-	client := http.DefaultClient
+	// Get OAuth2 token source using OpenID configuration
+	token, host, err := GetApiToken(apiKey)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to get OAuth2 token", err.Error())
+		return
+	}
+
+	// Create gRPC connection with OAuth2 credentials
+	conn, err := grpc.NewClient(
+		*host,
+		grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{})),
+		grpc.WithPerRPCCredentials(oauth.TokenSource{TokenSource: token}),
+	)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to connect to Unionai host", err.Error())
+		return
+	}
+
+	client := &providerContext{
+		conn: conn,
+	}
 	resp.DataSourceData = client
 	resp.ResourceData = client
 }

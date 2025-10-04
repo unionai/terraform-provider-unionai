@@ -1,22 +1,25 @@
 module github.com/unionai/terraform-provider-enterprise
 
-go 1.24.0
+go 1.24.6
 
 replace github.com/unionai/cloud => ../cloud
 
 require (
-	github.com/hashicorp/terraform-plugin-framework v1.16.0
+	github.com/coreos/go-oidc/v3 v3.15.0
+	github.com/hashicorp/terraform-plugin-framework v1.16.1
 	github.com/hashicorp/terraform-plugin-go v0.29.0
 	github.com/hashicorp/terraform-plugin-log v0.9.0
 	github.com/hashicorp/terraform-plugin-testing v1.13.3
-	github.com/unionai/cloud v0.0.0-00010101000000-000000000000
+	golang.org/x/oauth2 v0.30.0
+	google.golang.org/grpc v1.75.1
 )
 
 require (
-	github.com/envoyproxy/protoc-gen-validate v1.2.1 // indirect
+	cloud.google.com/go/compute/metadata v0.7.0 // indirect
 	github.com/fatih/color v1.16.0 // indirect
-	github.com/flyteorg/flyte/flyteidl v1.10.7-b0.0.20240109185447-d86f91995c44 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.1 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
+	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-hclog v1.6.3 // indirect
 	github.com/hashicorp/go-plugin v1.7.0 // indirect
 	github.com/hashicorp/go-uuid v1.0.3 // indirect
@@ -27,12 +30,15 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mitchellh/go-testing-interface v1.14.1 // indirect
 	github.com/oklog/run v1.1.0 // indirect
+	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/vmihailenco/msgpack/v5 v5.4.1 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
-	golang.org/x/net v0.43.0 // indirect
-	golang.org/x/sys v0.35.0 // indirect
-	golang.org/x/text v0.28.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250707201910-8d1bb00bc6a7 // indirect
-	google.golang.org/grpc v1.75.1 // indirect
+	go.opentelemetry.io/otel v1.38.0 // indirect
+	golang.org/x/crypto v0.42.0 // indirect
+	golang.org/x/net v0.44.0 // indirect
+	golang.org/x/sys v0.36.0 // indirect
+	golang.org/x/text v0.29.0 // indirect
+	golang.org/x/tools v0.37.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250908214217-97024824d090 // indirect
 	google.golang.org/protobuf v1.36.9 // indirect
 )

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	"net/http"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -25,7 +24,6 @@ func NewOAuthAppResource() resource.Resource {
 
 // OAuthAppResource defines the resource implementation.
 type OAuthAppResource struct {
-	client *http.Client
 }
 
 // OAuthAppResourceModel describes the resource data model.
@@ -141,18 +139,16 @@ func (r *OAuthAppResource) Configure(ctx context.Context, req resource.Configure
 		return
 	}
 
-	client, ok := req.ProviderData.(*http.Client)
+	_, ok := req.ProviderData.(*providerContext)
 
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected *http.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+			fmt.Sprintf("Expected *providerContext, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 
 		return
 	}
-
-	r.client = client
 }
 
 func (r *OAuthAppResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {

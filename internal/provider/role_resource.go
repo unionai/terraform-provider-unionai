@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"fmt"
-	"net/http"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -24,7 +23,6 @@ func NewRoleResource() resource.Resource {
 
 // RoleResource defines the resource implementation.
 type RoleResource struct {
-	client *http.Client
 }
 
 // RoleResourceModel describes the resource data model.
@@ -70,18 +68,16 @@ func (r *RoleResource) Configure(ctx context.Context, req resource.ConfigureRequ
 		return
 	}
 
-	client, ok := req.ProviderData.(*http.Client)
+	_, ok := req.ProviderData.(*providerContext)
 
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected *http.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+			fmt.Sprintf("Expected *providerContext, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 
 		return
 	}
-
-	r.client = client
 }
 
 func (r *RoleResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
