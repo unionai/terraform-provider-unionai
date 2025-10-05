@@ -130,52 +130,49 @@ func (d *ProjectDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		return
 	}
 
-	projects, err := d.conn.ListProjects(context.Background(), &admin.ProjectListRequest{})
+	project_id_filter := Filters{
+		FieldSelector: fmt.Sprintf("eq(project.identifier,%s)", data.Id.ValueString()),
+		Limit:         1,
+	}
+
+	projects, err := d.conn.ListProjects(context.Background(), &admin.ProjectListRequest{Filters: project_id_filter.FieldSelector, Limit: uint32(project_id_filter.Limit)})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to fetch projects", err.Error())
 		return
 	}
 	tflog.Trace(ctx, "ListProjects response", map[string]interface{}{"projects": projects})
 
-	found := false
-	for _, project := range projects.Projects {
-		tflog.Trace(ctx, "Project", map[string]interface{}{"project": project.Id, "target": data.Id.String()})
-		if project.Id == data.Id.ValueString() {
-			data.Name = types.StringValue(project.Name)
-
-			if project.Description != "" {
-				data.Description = types.StringValue(project.Description)
-			} else {
-				data.Description = types.StringNull()
-			}
-
-			data.Domains = make([]ProjectDomainDataSourceModel, 0, len(project.Domains))
-			for _, domain := range project.Domains {
-				data.Domains = append(data.Domains, ProjectDomainDataSourceModel{
-					Id:   types.StringValue(domain.Id),
-					Name: types.StringValue(domain.Name),
-				})
-			}
-
-			switch project.State {
-			case admin.Project_ACTIVE:
-				data.State = types.StringValue(string(Project_ACTIVE))
-			case admin.Project_ARCHIVED:
-				data.State = types.StringValue(string(Project_ARCHIVED))
-			case admin.Project_SYSTEM_GENERATED:
-				data.State = types.StringValue(string(Project_SYSTEM_GENERATED))
-			default:
-				data.State = types.StringValue(string(Project_UNKNOWN))
-			}
-
-			found = true
-			break
-		}
-	}
-
-	if !found {
+	if len(projects.Projects) == 0 {
 		resp.Diagnostics.AddError("Project not found", fmt.Sprintf("Project with ID %s not found", data.Id.String()))
 		return
+	}
+	project := projects.Projects[0]
+
+	tflog.Trace(ctx, "Project", map[string]interface{}{"project": project.Id, "target": data.Id.String()})
+
+	data.Name = types.StringValue(project.Name)
+	if project.Description != "" {
+		data.Description = types.StringValue(project.Description)
+	} else {
+		data.Description = types.StringNull()
+	}
+	data.Domains = make([]ProjectDomainDataSourceModel, 0, len(project.Domains))
+	for _, domain := range project.Domains {
+		data.Domains = append(data.Domains, ProjectDomainDataSourceModel{
+			Id:   types.StringValue(domain.Id),
+			Name: types.StringValue(domain.Name),
+		})
+	}
+
+	switch project.State {
+	case admin.Project_ACTIVE:
+		data.State = types.StringValue(string(Project_ACTIVE))
+	case admin.Project_ARCHIVED:
+		data.State = types.StringValue(string(Project_ARCHIVED))
+	case admin.Project_SYSTEM_GENERATED:
+		data.State = types.StringValue(string(Project_SYSTEM_GENERATED))
+	default:
+		data.State = types.StringValue(string(Project_UNKNOWN))
 	}
 
 	// Save data into Terraform state
