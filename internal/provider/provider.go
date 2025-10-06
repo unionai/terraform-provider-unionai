@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"os"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
@@ -30,6 +31,7 @@ type UnionaiProviderModel struct {
 
 type providerContext struct {
 	conn *grpc.ClientConn
+	org  string
 }
 
 func (p *UnionaiProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -89,6 +91,7 @@ func (p *UnionaiProvider) Configure(ctx context.Context, req provider.ConfigureR
 
 	client := &providerContext{
 		conn: conn,
+		org:  strings.Split(strings.TrimPrefix(strings.TrimPrefix(*host, "https://"), "dns:///"), ".")[0],
 	}
 	resp.DataSourceData = client
 	resp.ResourceData = client
