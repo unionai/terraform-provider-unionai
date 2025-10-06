@@ -23,7 +23,8 @@ type RoleDataSource struct {
 
 // RoleDataSourceModel describes the data source data model.
 type RoleDataSourceModel struct {
-	Id types.String `tfsdk:"id"`
+	Id      types.String `tfsdk:"id"`
+	Actions types.List   `tfsdk:"actions"`
 }
 
 func (d *RoleDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -38,6 +39,11 @@ func (d *RoleDataSource) Schema(ctx context.Context, req datasource.SchemaReques
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				MarkdownDescription: "Role identifier",
+				Required:            true,
+			},
+			"actions": schema.ListAttribute{
+				MarkdownDescription: "List of actions associated with the role",
+				ElementType:         types.StringType,
 				Computed:            true,
 			},
 		},
@@ -83,7 +89,17 @@ func (d *RoleDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 	// For the purposes of this example code, hardcoding a response value to
 	// save into the Terraform state.
 	data.Id = types.StringValue("role-id")
+	// Example: populate from API or static values
+	actions := []string{"view_flyte_executions", "view_flyte_inventory"}
 
+	// Convert []string → types.List
+	listValue, diag := types.ListValueFrom(ctx, types.StringType, actions)
+	resp.Diagnostics.Append(diag...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	data.Actions = listValue
 	// Write logs using the tflog package
 	// Documentation: https://terraform.io/plugin/log
 	tflog.Trace(ctx, "read a data source")
