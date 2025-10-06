@@ -21,9 +21,24 @@ func NewPolicyDataSource() datasource.DataSource {
 type PolicyDataSource struct {
 }
 
+type ResourceType string
+
+const (
+	ORG     ResourceType = "org"
+	DOMAIN  ResourceType = "org/domain"
+	PROJECT ResourceType = "org/domain/project"
+)
+
 // PolicyDataSourceModel describes the data source data model.
 type PolicyDataSourceModel struct {
-	Id types.String `tfsdk:"id"`
+	Id          types.String                   `tfsdk:"id"`
+	Bindings    []PolicyBindingDataSourceModel `tfsdk:"bindings"`
+	Description types.String                   `tfsdk:"description"`
+}
+
+type PolicyBindingDataSourceModel struct {
+	RoleId   types.String `tfsdk:"role_id"`
+	Resource types.String `tfsdk:"resource"`
 }
 
 func (d *PolicyDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -38,6 +53,26 @@ func (d *PolicyDataSource) Schema(ctx context.Context, req datasource.SchemaRequ
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				MarkdownDescription: "Policy identifier",
+				Required:            true,
+			},
+			"bindings": schema.ListNestedAttribute{
+				MarkdownDescription: "Policy bindings",
+				Computed:            true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"role_id": schema.StringAttribute{
+							MarkdownDescription: "Role identifier",
+							Computed:            true,
+						},
+						"resource": schema.StringAttribute{
+							MarkdownDescription: "Resource name",
+							Computed:            true,
+						},
+					},
+				},
+			},
+			"description": schema.StringAttribute{
+				MarkdownDescription: "Policy description",
 				Computed:            true,
 			},
 		},
@@ -80,9 +115,20 @@ func (d *PolicyDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 	//     return
 	// }
 
-	// For the purposes of this example code, hardcoding a response value to
-	// save into the Terraform state.
-	data.Id = types.StringValue("policy-id")
+	// Example: populate from API or static values
+	dummy := [][]string{
+		{"viewer", "union-internal/production"},
+		{"admin", "union-internal/development/flytesnacks"},
+	}
+	data.Bindings = make([]PolicyBindingDataSourceModel, len(dummy))
+	for i, dummy_data := range dummy {
+		data.Bindings[i] = PolicyBindingDataSourceModel{
+			RoleId:   types.StringValue(dummy_data[0]),
+			Resource: types.StringValue(dummy_data[1]),
+		}
+	}
+
+	data.Description = types.StringValue("")
 
 	// Write logs using the tflog package
 	// Documentation: https://terraform.io/plugin/log
