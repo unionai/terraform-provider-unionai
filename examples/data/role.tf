@@ -1,5 +1,5 @@
 data "unionai_role" "my_role" {
-  id = "viewer"
+  id = "contributor"
 }
 
 output "my_role" {
