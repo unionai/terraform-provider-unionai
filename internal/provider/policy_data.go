@@ -21,14 +21,6 @@ func NewPolicyDataSource() datasource.DataSource {
 type PolicyDataSource struct {
 }
 
-type ResourceType string
-
-const (
-	ORG     ResourceType = "org"
-	DOMAIN  ResourceType = "org/domain"
-	PROJECT ResourceType = "org/domain/project"
-)
-
 // PolicyDataSourceModel describes the data source data model.
 type PolicyDataSourceModel struct {
 	Id          types.String                   `tfsdk:"id"`
