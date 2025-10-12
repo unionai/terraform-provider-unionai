@@ -37,8 +37,14 @@ type PolicyDataSourceModel struct {
 }
 
 type PolicyBindingDataSourceModel struct {
-	RoleId   types.String `tfsdk:"role_id"`
-	Resource types.String `tfsdk:"resource"`
+	RoleId   types.String            `tfsdk:"role_id"`
+	Resource ResourceDataSourceModel `tfsdk:"resource"`
+}
+
+type ResourceDataSourceModel struct {
+	OrgId     types.String `tfsdk:"org_id"`
+	DomainId  types.String `tfsdk:"domain_id"`
+	ProjectId types.String `tfsdk:"project_id"`
 }
 
 func (d *PolicyDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -64,9 +70,23 @@ func (d *PolicyDataSource) Schema(ctx context.Context, req datasource.SchemaRequ
 							MarkdownDescription: "Role identifier",
 							Computed:            true,
 						},
-						"resource": schema.StringAttribute{
+						"resource": schema.SingleNestedAttribute{
 							MarkdownDescription: "Resource name",
 							Computed:            true,
+							Attributes: map[string]schema.Attribute{
+								"org_id": schema.StringAttribute{
+									MarkdownDescription: "Org identifier",
+									Computed:            true,
+								},
+								"domain_id": schema.StringAttribute{
+									MarkdownDescription: "Domain identifier",
+									Computed:            true,
+								},
+								"project_id": schema.StringAttribute{
+									MarkdownDescription: "Project identifier",
+									Computed:            true,
+								},
+							},
 						},
 					},
 				},
@@ -116,15 +136,12 @@ func (d *PolicyDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 	// }
 
 	// Example: populate from API or static values
-	dummy := [][]string{
-		{"viewer", "union-internal/production"},
-		{"admin", "union-internal/development/flytesnacks"},
-	}
-	data.Bindings = make([]PolicyBindingDataSourceModel, len(dummy))
-	for i, dummy_data := range dummy {
+
+	data.Bindings = make([]PolicyBindingDataSourceModel, 1)
+	for i := range 1 {
 		data.Bindings[i] = PolicyBindingDataSourceModel{
-			RoleId:   types.StringValue(dummy_data[0]),
-			Resource: types.StringValue(dummy_data[1]),
+			RoleId:   types.StringValue("viewer"),
+			Resource: ResourceDataSourceModel{OrgId: types.StringValue("union-internal"), DomainId: types.StringValue("development")},
 		}
 	}
 
