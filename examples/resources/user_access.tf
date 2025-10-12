@@ -3,6 +3,6 @@ resource "unionai_user_access" "nelson" {
   policy = unionai_policy.project1_admins.id
 }
 
-output "user_access_nelson" {
+output "user_access" {
   value = unionai_user_access.nelson
 }

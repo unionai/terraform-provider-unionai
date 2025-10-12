@@ -50,7 +50,7 @@ func (d *ApiKeyDataSource) Configure(ctx context.Context, req datasource.Configu
 		return
 	}
 
-	client, ok := req.ProviderData.(*providerContext)
+	_, ok := req.ProviderData.(*providerContext)
 
 	if !ok {
 		resp.Diagnostics.AddError(
