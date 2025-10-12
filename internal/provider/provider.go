@@ -32,6 +32,7 @@ type UnionaiProviderModel struct {
 type providerContext struct {
 	conn *grpc.ClientConn
 	org  string
+	host string
 }
 
 func (p *UnionaiProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -92,6 +93,7 @@ func (p *UnionaiProvider) Configure(ctx context.Context, req provider.ConfigureR
 	client := &providerContext{
 		conn: conn,
 		org:  strings.Split(strings.TrimPrefix(strings.TrimPrefix(*host, "https://"), "dns:///"), ".")[0],
+		host: *host,
 	}
 	resp.DataSourceData = client
 	resp.ResourceData = client
@@ -122,6 +124,7 @@ func (p *UnionaiProvider) DataSources(ctx context.Context) []func() datasource.D
 		NewAppAccessDataSource,
 		NewDataplaneDataSource,
 		NewDataplanesDataSource,
+		NewControlplaneDataSource,
 	}
 }
 
