@@ -8,6 +8,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/unionai/cloud/gen/pb-go/common"
+	"github.com/unionai/cloud/gen/pb-go/identity"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -19,11 +21,14 @@ func NewPolicyBindingDataSource() datasource.DataSource {
 
 // PolicyBindingDataSource defines the data source implementation.
 type PolicyBindingDataSource struct {
+	conn identity.UserServiceClient
+	org  string
 }
 
 // PolicyBindingDataSourceModel describes the data source data model.
 type PolicyBindingDataSourceModel struct {
-	Id types.String `tfsdk:"id"`
+	UserId   types.String `tfsdk:"user_id"`
+	PolicyId types.String `tfsdk:"policy_id"`
 }
 
 func (d *PolicyBindingDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -36,9 +41,13 @@ func (d *PolicyBindingDataSource) Schema(ctx context.Context, req datasource.Sch
 		MarkdownDescription: "Policy Binding data source",
 
 		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				MarkdownDescription: "Policy Binding identifier",
-				Computed:            true,
+			"user_id": schema.StringAttribute{
+				MarkdownDescription: "User identifier",
+				Required:            true,
+			},
+			"policy_id": schema.StringAttribute{
+				MarkdownDescription: "Policy identifier",
+				Required:            true,
 			},
 		},
 	}
@@ -50,7 +59,7 @@ func (d *PolicyBindingDataSource) Configure(ctx context.Context, req datasource.
 		return
 	}
 
-	_, ok := req.ProviderData.(*providerContext)
+	client, ok := req.ProviderData.(*providerContext)
 
 	if !ok {
 		resp.Diagnostics.AddError(
@@ -60,6 +69,16 @@ func (d *PolicyBindingDataSource) Configure(ctx context.Context, req datasource.
 
 		return
 	}
+
+	d.conn = identity.NewUserServiceClient(client.conn)
+	if d.conn == nil {
+		resp.Diagnostics.AddError(
+			"Unexpected Data Source Configure Type",
+			fmt.Sprintf("Expected *identity.UserServiceClient, got: %T. Please report this issue to the provider developers.", d.conn),
+		)
+		return
+	}
+	d.org = client.org
 }
 
 func (d *PolicyBindingDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -72,21 +91,51 @@ func (d *PolicyBindingDataSource) Read(ctx context.Context, req datasource.ReadR
 		return
 	}
 
-	// If applicable, this is a great opportunity to initialize any necessary
-	// provider client data and make a call using it.
-	// httpResp, err := d.client.Do(httpReq)
-	// if err != nil {
-	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read policy binding, got error: %s", err))
-	//     return
-	// }
+	users, err := d.conn.ListUsers(ctx, &identity.ListUsersRequest{
+		Organization: d.org,
+		Request: &common.ListRequest{
+			Filters: []*common.Filter{
+				{
+					Field:    "email",
+					Function: common.Filter_EQUAL,
+					Values:   []string{data.UserId.ValueString()},
+				},
+			},
+		},
+		IncludeSupportStaff: true,
+	})
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to fetch user", err.Error())
+		return
+	}
+	if len(users.Users) == 0 {
+		resp.Diagnostics.AddError("User not found", fmt.Sprintf("User %s not found", data.UserId.ValueString()))
+		return
+	}
+	user := users.Users[0]
+	tflog.Trace(ctx, "Fetched user", map[string]interface{}{
+		"user": user,
+	})
 
-	// For the purposes of this example code, hardcoding a response value to
-	// save into the Terraform state.
-	data.Id = types.StringValue("policy-binding-id")
+	tflog.Trace(ctx, "Fetched user indentity policies", map[string]interface{}{
+		"user_email": data.UserId.ValueString(),
+		"policies":   user.Policies,
+	})
 
-	// Write logs using the tflog package
-	// Documentation: https://terraform.io/plugin/log
-	tflog.Trace(ctx, "read a data source")
+	var assigned bool
+	for _, p := range user.Policies {
+		if p.Id.Name == data.PolicyId.ValueString() && p.Id.Organization == d.org {
+			assigned = true
+			break
+		}
+	}
+
+	// Check if the user is assigned to the policy
+	if !assigned {
+		resp.Diagnostics.AddError("User not assigned to policy",
+			fmt.Sprintf("User %s is not assigned to policy %s", data.UserId.ValueString(), data.PolicyId.ValueString()))
+		return
+	}
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
