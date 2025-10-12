@@ -23,7 +23,20 @@ type PolicyDataSource struct {
 
 // PolicyDataSourceModel describes the data source data model.
 type PolicyDataSourceModel struct {
-	Id types.String `tfsdk:"id"`
+	Id          types.String                   `tfsdk:"id"`
+	Bindings    []PolicyBindingDataSourceModel `tfsdk:"bindings"`
+	Description types.String                   `tfsdk:"description"`
+}
+
+type PolicyBindingDataSourceModel struct {
+	RoleId   types.String            `tfsdk:"role_id"`
+	Resource ResourceDataSourceModel `tfsdk:"resource"`
+}
+
+type ResourceDataSourceModel struct {
+	OrgId     types.String `tfsdk:"org_id"`
+	DomainId  types.String `tfsdk:"domain_id"`
+	ProjectId types.String `tfsdk:"project_id"`
 }
 
 func (d *PolicyDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -38,6 +51,40 @@ func (d *PolicyDataSource) Schema(ctx context.Context, req datasource.SchemaRequ
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				MarkdownDescription: "Policy identifier",
+				Required:            true,
+			},
+			"bindings": schema.ListNestedAttribute{
+				MarkdownDescription: "Policy bindings",
+				Computed:            true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"role_id": schema.StringAttribute{
+							MarkdownDescription: "Role identifier",
+							Computed:            true,
+						},
+						"resource": schema.SingleNestedAttribute{
+							MarkdownDescription: "Resource name",
+							Computed:            true,
+							Attributes: map[string]schema.Attribute{
+								"org_id": schema.StringAttribute{
+									MarkdownDescription: "Org identifier",
+									Computed:            true,
+								},
+								"domain_id": schema.StringAttribute{
+									MarkdownDescription: "Domain identifier",
+									Computed:            true,
+								},
+								"project_id": schema.StringAttribute{
+									MarkdownDescription: "Project identifier",
+									Computed:            true,
+								},
+							},
+						},
+					},
+				},
+			},
+			"description": schema.StringAttribute{
+				MarkdownDescription: "Policy description",
 				Computed:            true,
 			},
 		},
@@ -80,9 +127,17 @@ func (d *PolicyDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 	//     return
 	// }
 
-	// For the purposes of this example code, hardcoding a response value to
-	// save into the Terraform state.
-	data.Id = types.StringValue("policy-id")
+	// Example: populate from API or static values
+
+	data.Bindings = make([]PolicyBindingDataSourceModel, 1)
+	for i := range 1 {
+		data.Bindings[i] = PolicyBindingDataSourceModel{
+			RoleId:   types.StringValue("viewer"),
+			Resource: ResourceDataSourceModel{OrgId: types.StringValue("union-internal"), DomainId: types.StringValue("development")},
+		}
+	}
+
+	data.Description = types.StringValue("")
 
 	// Write logs using the tflog package
 	// Documentation: https://terraform.io/plugin/log
