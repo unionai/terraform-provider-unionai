@@ -23,12 +23,12 @@ type PolicyDataSource struct {
 
 // PolicyDataSourceModel describes the data source data model.
 type PolicyDataSourceModel struct {
-	Id          types.String                   `tfsdk:"id"`
-	Bindings    []PolicyBindingDataSourceModel `tfsdk:"bindings"`
-	Description types.String                   `tfsdk:"description"`
+	Id          types.String                `tfsdk:"id"`
+	Roles       []PolicyRoleDataSourceModel `tfsdk:"roles"`
+	Description types.String                `tfsdk:"description"`
 }
 
-type PolicyBindingDataSourceModel struct {
+type PolicyRoleDataSourceModel struct {
 	RoleId   types.String            `tfsdk:"role_id"`
 	Resource ResourceDataSourceModel `tfsdk:"resource"`
 }
@@ -53,8 +53,8 @@ func (d *PolicyDataSource) Schema(ctx context.Context, req datasource.SchemaRequ
 				MarkdownDescription: "Policy identifier",
 				Required:            true,
 			},
-			"bindings": schema.ListNestedAttribute{
-				MarkdownDescription: "Policy bindings",
+			"roles": schema.ListNestedAttribute{
+				MarkdownDescription: "Policy roles",
 				Computed:            true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
@@ -129,9 +129,9 @@ func (d *PolicyDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 
 	// Example: populate from API or static values
 
-	data.Bindings = make([]PolicyBindingDataSourceModel, 1)
+	data.Roles = make([]PolicyRoleDataSourceModel, 1)
 	for i := range 1 {
-		data.Bindings[i] = PolicyBindingDataSourceModel{
+		data.Roles[i] = PolicyRoleDataSourceModel{
 			RoleId:   types.StringValue("viewer"),
 			Resource: ResourceDataSourceModel{OrgId: types.StringValue("union-internal"), DomainId: types.StringValue("development")},
 		}
