@@ -101,9 +101,9 @@ func (p *UnionaiProvider) Resources(ctx context.Context) []func() resource.Resou
 	return []func() resource.Resource{
 		NewProjectResource,
 		NewUserResource,
+		NewUserAccessResource,
 		NewRoleResource,
 		NewPolicyResource,
-		NewPolicyBindingResource,
 		NewOAuthAppResource,
 	}
 }
@@ -112,9 +112,9 @@ func (p *UnionaiProvider) DataSources(ctx context.Context) []func() datasource.D
 	return []func() datasource.DataSource{
 		NewProjectDataSource,
 		NewUserDataSource,
+		NewUserAccessDataSource,
 		NewRoleDataSource,
 		NewPolicyDataSource,
-		NewPolicyBindingDataSource,
 		NewOAuthAppDataSource,
 	}
 }
