@@ -11,40 +11,40 @@ import (
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
-var _ datasource.DataSource = &OAuthAppDataSource{}
+var _ datasource.DataSource = &AppDataSource{}
 
-func NewOAuthAppDataSource() datasource.DataSource {
-	return &OAuthAppDataSource{}
+func NewAppDataSource() datasource.DataSource {
+	return &AppDataSource{}
 }
 
-// OAuthAppDataSource defines the data source implementation.
-type OAuthAppDataSource struct {
+// AppDataSource defines the data source implementation.
+type AppDataSource struct {
 }
 
-// OAuthAppDataSourceModel describes the data source data model.
-type OAuthAppDataSourceModel struct {
+// AppDataSourceModel describes the data source data model.
+type AppDataSourceModel struct {
 	Id types.String `tfsdk:"id"`
 }
 
-func (d *OAuthAppDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_oauth_app"
+func (d *AppDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_application"
 }
 
-func (d *OAuthAppDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+func (d *AppDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		// This description is used by the documentation generator and the language server.
-		MarkdownDescription: "OAuth app data source",
+		MarkdownDescription: "Application data source",
 
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				MarkdownDescription: "OAuth app identifier",
-				Computed:            true,
+				MarkdownDescription: "Application identifier",
+				Required:            true,
 			},
 		},
 	}
 }
 
-func (d *OAuthAppDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+func (d *AppDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
 	// Prevent panic if the provider has not been configured.
 	if req.ProviderData == nil {
 		return
@@ -61,8 +61,8 @@ func (d *OAuthAppDataSource) Configure(ctx context.Context, req datasource.Confi
 	}
 }
 
-func (d *OAuthAppDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var data OAuthAppDataSourceModel
+func (d *AppDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	var data AppDataSourceModel
 
 	// Read Terraform configuration data into the model
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
@@ -81,7 +81,7 @@ func (d *OAuthAppDataSource) Read(ctx context.Context, req datasource.ReadReques
 
 	// For the purposes of this example code, hardcoding a response value to
 	// save into the Terraform state.
-	data.Id = types.StringValue("oauth-app-id")
+	data.Id = types.StringValue("application-id")
 
 	// Write logs using the tflog package
 	// Documentation: https://terraform.io/plugin/log

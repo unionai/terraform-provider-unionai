@@ -1,4 +1,4 @@
-resource "unionai_oauth_app" "myapp" {
+resource "unionai_application" "myapp" {
   client_id      = "dummy-client-name"
   client_name    = "dummy client name"
   client_uri     = "https://dummyclienturi"
@@ -28,5 +28,5 @@ output "oauth_app_secret_id" {
 
 output "oauth_app_secret" {
   sensitive = true
-  value     = unionai_oauth_app.myapp.secret
+  value     = unionai_application.myapp.secret
 }

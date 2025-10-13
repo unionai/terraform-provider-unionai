@@ -5,3 +5,7 @@ resource "unionai_role" "admin" {
     "administer_project",
   ]
 }
+
+output "role_admin" {
+  value = unionai_role.admin
+}
