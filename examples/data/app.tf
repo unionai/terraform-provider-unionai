@@ -1,5 +1,5 @@
 data "unionai_application" "myapp" {
-  id = "uctl-tryv2"
+  id = "tryv2-uctl"
 }
 
 output "application" {
