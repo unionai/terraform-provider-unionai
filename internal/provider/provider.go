@@ -105,6 +105,7 @@ func (p *UnionaiProvider) Resources(ctx context.Context) []func() resource.Resou
 		NewPolicyResource,
 		NewPolicyBindingResource,
 		NewOAuthAppResource,
+		NewApiKeyResource,
 	}
 }
 
@@ -116,6 +117,7 @@ func (p *UnionaiProvider) DataSources(ctx context.Context) []func() datasource.D
 		NewPolicyDataSource,
 		NewPolicyBindingDataSource,
 		NewOAuthAppDataSource,
+		NewApiKeyDataSource,
 	}
 }
 
