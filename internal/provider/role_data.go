@@ -25,24 +25,6 @@ type RoleDataSource struct {
 	org  string
 }
 
-type ActionName string
-
-const (
-	ACTION_VIEW_FLYTE_INVENTORY              ActionName = "view_flyte_inventory"
-	ACTION_VIEW_FLYTE_EXECUTIONS             ActionName = "view_flyte_executions"
-	ACTION_REGISTER_FLYTE_INVENTORY          ActionName = "register_flyte_inventory"
-	ACTION_CREATE_FLYTE_EXECUTIONS           ActionName = "create_flyte_executions"
-	ACTION_ADMINISTER_PROJECT                ActionName = "administer_project"
-	ACTION_MANAGE_PERMISSIONS                ActionName = "manage_permissions"
-	ACTION_ADMINISTER_ACCOUNT                ActionName = "administer_account"
-	ACTION_MANAGE_CLUSTER                    ActionName = "manage_cluster"
-	ACTION_EDIT_EXECUTION_RELATED_ATTRIBUTES ActionName = "edit_execution_related_attributes"
-	ACTION_EDIT_CLUSTER_RELATED_ATTRIBUTES   ActionName = "edit_cluster_related_attributes"
-	ACTION_EDIT_UNUSED_ATTRIBUTES            ActionName = "edit_unused_attributes"
-	ACTION_SUPPORT_SYSTEM_LOGS               ActionName = "support_system_logs"
-	ACTION_UNKNOWN                           ActionName = "unknown"
-)
-
 // RoleDataSourceModel describes the data source data model.
 type RoleDataSourceModel struct {
 	Id      types.String `tfsdk:"id"`
@@ -117,39 +99,9 @@ func (d *RoleDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 	}
 	tflog.Trace(ctx, "GetRole response", map[string]interface{}{"role": role})
 
-	actions := make([]ActionName, 0, len(role.Role.Actions))
+	actions := make([]string, 0, len(role.Role.Actions))
 	for _, action := range role.Role.Actions {
-		var _action ActionName
-		switch action {
-		case common.Action_ACTION_VIEW_FLYTE_INVENTORY:
-			_action = ACTION_VIEW_FLYTE_INVENTORY
-		case common.Action_ACTION_VIEW_FLYTE_EXECUTIONS:
-			_action = ACTION_VIEW_FLYTE_EXECUTIONS
-		case common.Action_ACTION_REGISTER_FLYTE_INVENTORY:
-			_action = ACTION_REGISTER_FLYTE_INVENTORY
-		case common.Action_ACTION_CREATE_FLYTE_EXECUTIONS:
-			_action = ACTION_CREATE_FLYTE_EXECUTIONS
-		case common.Action_ACTION_ADMINISTER_PROJECT:
-			_action = ACTION_ADMINISTER_PROJECT
-		case common.Action_ACTION_MANAGE_PERMISSIONS:
-			_action = ACTION_MANAGE_PERMISSIONS
-		case common.Action_ACTION_ADMINISTER_ACCOUNT:
-			_action = ACTION_ADMINISTER_ACCOUNT
-		case common.Action_ACTION_MANAGE_CLUSTER:
-			_action = ACTION_MANAGE_CLUSTER
-		case common.Action_ACTION_EDIT_CLUSTER_RELATED_ATTRIBUTES:
-			_action = ACTION_EDIT_CLUSTER_RELATED_ATTRIBUTES
-		case common.Action_ACTION_EDIT_EXECUTION_RELATED_ATTRIBUTES:
-			_action = ACTION_EDIT_EXECUTION_RELATED_ATTRIBUTES
-		case common.Action_ACTION_EDIT_UNUSED_ATTRIBUTES:
-			_action = ACTION_EDIT_UNUSED_ATTRIBUTES
-		case common.Action_ACTION_SUPPORT_SYSTEM_LOGS:
-			_action = ACTION_SUPPORT_SYSTEM_LOGS
-		default:
-			_action = ACTION_UNKNOWN
-		}
-
-		actions = append(actions, _action)
+		actions = append(actions, common.Action_name[int32(action)])
 	}
 
 	// Convert []string → types.List
