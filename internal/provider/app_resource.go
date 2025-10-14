@@ -161,17 +161,7 @@ func (r *AppResource) Create(ctx context.Context, req resource.CreateRequest, re
 		return
 	}
 
-	// If applicable, this is a great opportunity to initialize any necessary
-	// provider client data and make a call using it.
-	// httpResp, err := r.client.Do(httpReq)
-	// if err != nil {
-	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create oauth app, got error: %s", err))
-	//     return
-	// }
-
-	// For the purposes of this example code, hardcoding a response value to
-	// save into the Terraform state.
-	data.Id = types.StringValue("application-id")
+	data.Id = data.ClientId // Our ID will match the client ID which is unique
 
 	// Fake secret. Replace with real one
 	data.Secret = types.StringValue(fmt.Sprintf("fake-%d", rand.Int63()))
