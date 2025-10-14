@@ -22,6 +22,10 @@ resource "unionai_oauth_app" "myapp" {
   tos_uri                    = "https://dummytosuri"
 }
 
+output "oauth_app_secret_id" {
+  value = unionai_oauth_app.myapp.id
+}
+
 output "oauth_app_secret" {
   sensitive = true
   value     = unionai_oauth_app.myapp.secret
