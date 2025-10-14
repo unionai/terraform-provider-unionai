@@ -1,5 +1,5 @@
 data "unionai_user_access" "example" {
-  user_id   = "nelson@union.ai"
+  user_id   = data.unionai_user.example.id
   policy_id = "admin"
 }
 

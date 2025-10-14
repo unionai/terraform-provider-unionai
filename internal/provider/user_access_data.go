@@ -91,28 +91,16 @@ func (d *UserAccessDataSource) Read(ctx context.Context, req datasource.ReadRequ
 		return
 	}
 
-	users, err := d.conn.ListUsers(ctx, &identity.ListUsersRequest{
-		Organization: d.org,
-		Request: &common.ListRequest{
-			Filters: []*common.Filter{
-				{
-					Field:    "email",
-					Function: common.Filter_EQUAL,
-					Values:   []string{data.UserId.ValueString()},
-				},
-			},
+	userResp, err := d.conn.GetUser(ctx, &identity.GetUserRequest{
+		Id: &common.UserIdentifier{
+			Subject: data.UserId.ValueString(),
 		},
-		IncludeSupportStaff: true,
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to fetch user", err.Error())
 		return
 	}
-	if len(users.Users) == 0 {
-		resp.Diagnostics.AddError("User not found", fmt.Sprintf("User %s not found", data.UserId.ValueString()))
-		return
-	}
-	user := users.Users[0]
+	user := userResp.User
 	tflog.Trace(ctx, "Fetched user", map[string]interface{}{
 		"user": user,
 	})
