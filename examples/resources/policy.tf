@@ -17,3 +17,7 @@ resource "unionai_policy" "project1_admins" {
     }
   }
 }
+
+output "project1_admins" {
+  value = unionai_policy.project1_admins
+}
