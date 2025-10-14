@@ -26,16 +26,11 @@ type ProjectDataSource struct {
 
 // ProjectDataSourceModel describes the data source data model.
 type ProjectDataSourceModel struct {
-	Id          types.String                   `tfsdk:"id"`
-	Name        types.String                   `tfsdk:"name"`
-	Description types.String                   `tfsdk:"description"`
-	Domains     []ProjectDomainDataSourceModel `tfsdk:"domains"`
-	State       types.String                   `tfsdk:"state"`
-}
-
-type ProjectDomainDataSourceModel struct {
-	Id   types.String `tfsdk:"id"`
-	Name types.String `tfsdk:"name"`
+	Id          types.String   `tfsdk:"id"`
+	Name        types.String   `tfsdk:"name"`
+	Description types.String   `tfsdk:"description"`
+	DomainIds   []types.String `tfsdk:"domain_ids"`
+	State       types.String   `tfsdk:"state"`
 }
 
 func (d *ProjectDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -60,21 +55,10 @@ func (d *ProjectDataSource) Schema(ctx context.Context, req datasource.SchemaReq
 				MarkdownDescription: "Project description",
 				Computed:            true,
 			},
-			"domains": schema.ListNestedAttribute{
-				MarkdownDescription: "Project domains",
+			"domain_ids": schema.ListAttribute{
+				MarkdownDescription: "Project domain identifiers",
 				Computed:            true,
-				NestedObject: schema.NestedAttributeObject{
-					Attributes: map[string]schema.Attribute{
-						"id": schema.StringAttribute{
-							MarkdownDescription: "Project domain identifier",
-							Computed:            true,
-						},
-						"name": schema.StringAttribute{
-							MarkdownDescription: "Project domain name",
-							Computed:            true,
-						},
-					},
-				},
+				ElementType:         types.StringType,
 			},
 			"state": schema.StringAttribute{
 				MarkdownDescription: "Project state",
@@ -146,12 +130,9 @@ func (d *ProjectDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	} else {
 		data.Description = types.StringNull()
 	}
-	data.Domains = make([]ProjectDomainDataSourceModel, 0, len(project.Domains))
+	data.DomainIds = make([]types.String, 0, len(project.Domains))
 	for _, domain := range project.Domains {
-		data.Domains = append(data.Domains, ProjectDomainDataSourceModel{
-			Id:   types.StringValue(domain.Id),
-			Name: types.StringValue(domain.Name),
-		})
+		data.DomainIds = append(data.DomainIds, types.StringValue(domain.Id))
 	}
 	data.State = types.StringValue(admin.Project_ProjectState_name[int32(project.State)])
 
