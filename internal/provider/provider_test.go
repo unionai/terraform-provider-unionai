@@ -59,16 +59,16 @@ func TestUnionaiProvider_New(t *testing.T) {
 // TestUnionaiProvider_Metadata tests the provider metadata
 func TestUnionaiProvider_Metadata(t *testing.T) {
 	p := New("1.0.0")()
-	
+
 	req := provider.MetadataRequest{}
 	resp := &provider.MetadataResponse{}
-	
+
 	p.Metadata(context.Background(), req, resp)
-	
+
 	if resp.TypeName != "unionai" {
 		t.Errorf("Expected TypeName 'unionai', got '%s'", resp.TypeName)
 	}
-	
+
 	if resp.Version != "1.0.0" {
 		t.Errorf("Expected Version '1.0.0', got '%s'", resp.Version)
 	}
@@ -77,16 +77,16 @@ func TestUnionaiProvider_Metadata(t *testing.T) {
 // TestUnionaiProvider_Schema tests the provider schema
 func TestUnionaiProvider_Schema(t *testing.T) {
 	p := New("test")()
-	
+
 	req := provider.SchemaRequest{}
 	resp := &provider.SchemaResponse{}
-	
+
 	p.Schema(context.Background(), req, resp)
-	
+
 	if resp.Diagnostics.HasError() {
 		t.Fatalf("Schema() returned errors: %v", resp.Diagnostics.Errors())
 	}
-	
+
 	// Check that api_key attribute exists
 	if _, exists := resp.Schema.Attributes["api_key"]; !exists {
 		t.Error("Expected 'api_key' attribute in schema")
@@ -96,21 +96,21 @@ func TestUnionaiProvider_Schema(t *testing.T) {
 // TestUnionaiProvider_Resources tests that all expected resources are registered
 func TestUnionaiProvider_Resources(t *testing.T) {
 	p := New("test")()
-	
+
 	resources := p.Resources(context.Background())
-	
-	expectedResourceCount := 6 // Project, User, Role, Policy, PolicyBinding, OAuthApp
+
+	expectedResourceCount := 7 // Project, User, Role, Policy, PolicyBinding, OAuthApp
 	if len(resources) != expectedResourceCount {
 		t.Errorf("Expected %d resources, got %d", expectedResourceCount, len(resources))
 	}
-	
+
 	// Test that each resource function returns a non-nil resource
 	for i, resourceFunc := range resources {
 		if resourceFunc == nil {
 			t.Errorf("Resource function at index %d is nil", i)
 			continue
 		}
-		
+
 		resource := resourceFunc()
 		if resource == nil {
 			t.Errorf("Resource function at index %d returned nil", i)
@@ -121,21 +121,21 @@ func TestUnionaiProvider_Resources(t *testing.T) {
 // TestUnionaiProvider_DataSources tests that all expected data sources are registered
 func TestUnionaiProvider_DataSources(t *testing.T) {
 	p := New("test")()
-	
+
 	dataSources := p.DataSources(context.Background())
-	
-	expectedDataSourceCount := 6 // Project, User, Role, Policy, PolicyBinding, OAuthApp
+
+	expectedDataSourceCount := 7 // Project, User, Role, Policy, PolicyBinding, OAuthApp
 	if len(dataSources) != expectedDataSourceCount {
 		t.Errorf("Expected %d data sources, got %d", expectedDataSourceCount, len(dataSources))
 	}
-	
+
 	// Test that each data source function returns a non-nil data source
 	for i, dataSourceFunc := range dataSources {
 		if dataSourceFunc == nil {
 			t.Errorf("Data source function at index %d is nil", i)
 			continue
 		}
-		
+
 		dataSource := dataSourceFunc()
 		if dataSource == nil {
 			t.Errorf("Data source function at index %d returned nil", i)

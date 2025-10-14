@@ -120,6 +120,8 @@ func (p *UnionaiProvider) DataSources(ctx context.Context) []func() datasource.D
 		NewApiKeyDataSource,
 		NewAppDataSource,
 		NewAppAccessDataSource,
+		NewDataplaneDataSource,
+		NewDataplanesDataSource,
 	}
 }
 

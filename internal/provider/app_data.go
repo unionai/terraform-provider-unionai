@@ -57,6 +57,7 @@ func (d *AppDataSource) Configure(ctx context.Context, req datasource.ConfigureR
 			"Unexpected Data Source Configure Type",
 			fmt.Sprintf("Expected *providerContext, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
+
 		return
 	}
 }
@@ -75,7 +76,7 @@ func (d *AppDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 	// provider client data and make a call using it.
 	// httpResp, err := d.client.Do(httpReq)
 	// if err != nil {
-	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read oauth app, got error: %s", err))
+	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read app, got error: %s", err))
 	//     return
 	// }
 
