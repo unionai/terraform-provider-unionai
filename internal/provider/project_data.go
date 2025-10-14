@@ -24,16 +24,6 @@ type ProjectDataSource struct {
 	conn service.AdminServiceClient
 }
 
-type ProjectState string
-
-const (
-	Project_ACTIVE           ProjectState = "ACTIVE"
-	Project_ARCHIVED         ProjectState = "ARCHIVED"
-	Project_SYSTEM_GENERATED ProjectState = "SYSTEM_GENERATED"
-	Project_SYSTEM_ARCHIVED  ProjectState = "SYSTEM_ARCHIVED"
-	Project_UNKNOWN          ProjectState = "UNKNOWN"
-)
-
 // ProjectDataSourceModel describes the data source data model.
 type ProjectDataSourceModel struct {
 	Id          types.String                   `tfsdk:"id"`
@@ -163,17 +153,7 @@ func (d *ProjectDataSource) Read(ctx context.Context, req datasource.ReadRequest
 			Name: types.StringValue(domain.Name),
 		})
 	}
-
-	switch project.State {
-	case admin.Project_ACTIVE:
-		data.State = types.StringValue(string(Project_ACTIVE))
-	case admin.Project_ARCHIVED:
-		data.State = types.StringValue(string(Project_ARCHIVED))
-	case admin.Project_SYSTEM_GENERATED:
-		data.State = types.StringValue(string(Project_SYSTEM_GENERATED))
-	default:
-		data.State = types.StringValue(string(Project_UNKNOWN))
-	}
+	data.State = types.StringValue(admin.Project_ProjectState_name[int32(project.State)])
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

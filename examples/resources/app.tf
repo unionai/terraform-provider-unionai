@@ -22,11 +22,11 @@ resource "unionai_application" "myapp" {
   tos_uri                    = "https://dummytosuri"
 }
 
-output "app_secret_id" {
+output "app_id" {
   value = unionai_application.myapp.id
 }
 
-output "oauth_app_secret" {
+output "app_secret" {
   sensitive = true
   value     = unionai_application.myapp.secret
 }

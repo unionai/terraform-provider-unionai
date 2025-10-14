@@ -25,22 +25,6 @@ type DataplaneDataSource struct {
 	org  string
 }
 
-type DataplaneState string
-
-const (
-	DATAPLANE_STATE_ENABLED  DataplaneState = "ENABLED"
-	DATAPLANE_STATE_DISABLED DataplaneState = "DISABLED"
-	DATAPLANE_STATE_UNKNOWN  DataplaneState = "UNKNOWN"
-)
-
-type DataplaneHealth string
-
-const (
-	DATAPLANE_HEALTH_HEALTHY   DataplaneHealth = "HEALTHY"
-	DATAPLANE_HEALTH_UNHEALTHY DataplaneHealth = "UNHEALTHY"
-	DATAPLANE_HEALTH_UNKNOWN   DataplaneHealth = "UNKNOWN"
-)
-
 // DataplaneDataSourceModel describes the data source data model.
 type DataplaneDataSourceModel struct {
 	Id     types.String `tfsdk:"id"`
@@ -125,31 +109,9 @@ func (d *DataplaneDataSource) Read(ctx context.Context, req datasource.ReadReque
 	}
 	tflog.Trace(ctx, "GetCluster response", map[string]interface{}{"cluster": c})
 
-	data.Health = parseHealth(c.Cluster.Status.Health)
-	data.State = parseStatus(c.Cluster.Status.State)
+	data.Health = types.StringValue(cluster.Status_Health_name[int32(c.Cluster.Status.Health)])
+	data.State = types.StringValue(cluster.State_name[int32(c.Cluster.Status.State)])
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
-}
-
-func parseHealth(h cluster.Status_Health) types.String {
-	switch h {
-	case cluster.Status_HEALTHY:
-		return types.StringValue(string(DATAPLANE_HEALTH_HEALTHY))
-	case cluster.Status_UNHEALTHY:
-		return types.StringValue(string(DATAPLANE_HEALTH_UNHEALTHY))
-	default:
-		return types.StringValue(string(DATAPLANE_HEALTH_UNKNOWN))
-	}
-}
-
-func parseStatus(s cluster.State) types.String {
-	switch s {
-	case cluster.State_STATE_ENABLED:
-		return types.StringValue(string(DATAPLANE_STATE_ENABLED))
-	case cluster.State_STATE_DISABLED:
-		return types.StringValue(string(DATAPLANE_STATE_DISABLED))
-	default:
-		return types.StringValue(string(DATAPLANE_STATE_UNKNOWN))
-	}
 }
