@@ -7,7 +7,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/unionai/cloud/gen/pb-go/authorizer"
+	"github.com/unionai/cloud/gen/pb-go/common"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -19,6 +20,8 @@ func NewPolicyDataSource() datasource.DataSource {
 
 // PolicyDataSource defines the data source implementation.
 type PolicyDataSource struct {
+	conn authorizer.AuthorizerServiceClient
+	org  string
 }
 
 // PolicyDataSourceModel describes the data source data model.
@@ -97,7 +100,7 @@ func (d *PolicyDataSource) Configure(ctx context.Context, req datasource.Configu
 		return
 	}
 
-	_, ok := req.ProviderData.(*providerContext)
+	client, ok := req.ProviderData.(*providerContext)
 
 	if !ok {
 		resp.Diagnostics.AddError(
@@ -107,6 +110,16 @@ func (d *PolicyDataSource) Configure(ctx context.Context, req datasource.Configu
 
 		return
 	}
+
+	d.conn = authorizer.NewAuthorizerServiceClient(client.conn)
+	if d.conn == nil {
+		resp.Diagnostics.AddError(
+			"Unexpected Resource Configure Type",
+			fmt.Sprintf("Expected *authorizer.AuthorizerServiceClient, got: %T. Please report this issue to the provider developers.", d.conn),
+		)
+		return
+	}
+	d.org = client.org
 }
 
 func (d *PolicyDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -119,29 +132,34 @@ func (d *PolicyDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 		return
 	}
 
-	// If applicable, this is a great opportunity to initialize any necessary
-	// provider client data and make a call using it.
-	// httpResp, err := d.client.Do(httpReq)
-	// if err != nil {
-	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read policy, got error: %s", err))
-	//     return
-	// }
-
-	// Example: populate from API or static values
-
-	data.Roles = make([]PolicyRoleDataSourceModel, 1)
-	for i := range 1 {
-		data.Roles[i] = PolicyRoleDataSourceModel{
-			RoleId:   types.StringValue("viewer"),
-			Resource: ResourceDataSourceModel{OrgId: types.StringValue("union-internal"), DomainId: types.StringValue("development")},
-		}
+	policy, err := d.conn.GetPolicy(ctx, &authorizer.GetPolicyRequest{
+		Id: &common.PolicyIdentifier{
+			Name:         data.Id.ValueString(),
+			Organization: d.org,
+		},
+	})
+	if err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read policy, got error: %s", err))
+		return
 	}
 
-	data.Description = types.StringValue("")
-
-	// Write logs using the tflog package
-	// Documentation: https://terraform.io/plugin/log
-	tflog.Trace(ctx, "read a data source")
+	data.Description = types.StringValue(policy.Policy.Description)
+	for _, b := range policy.Policy.Bindings {
+		var r ResourceDataSourceModel
+		if b.Resource.GetOrganization() != nil {
+			r.OrgId = types.StringValue(b.Resource.GetOrganization().Name)
+		}
+		if b.Resource.GetDomain() != nil {
+			r.DomainId = types.StringValue(b.Resource.GetDomain().Name)
+		}
+		if b.Resource.GetProject() != nil {
+			r.ProjectId = types.StringValue(b.Resource.GetProject().Name)
+		}
+		data.Roles = append(data.Roles, PolicyRoleDataSourceModel{
+			RoleId:   types.StringValue(b.RoleId.Name),
+			Resource: r,
+		})
+	}
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

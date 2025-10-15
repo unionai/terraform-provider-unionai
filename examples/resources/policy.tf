@@ -2,7 +2,7 @@ resource "unionai_policy" "project1_admins" {
   name = "project-1-admins"
 
   role {
-    id = unionai_role.admin.id
+    id = unionai_role.example.id
     resource {
       project = unionai_project.nelson.name
       domain  = "development"
@@ -10,7 +10,7 @@ resource "unionai_policy" "project1_admins" {
   }
 
   role {
-    id = unionai_role.admin.id
+    id = unionai_role.example.id
     resource {
       project = unionai_project.nelson.name
       domain  = "staging"
