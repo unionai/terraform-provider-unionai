@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -28,7 +29,7 @@ type RoleDataSource struct {
 // RoleDataSourceModel describes the data source data model.
 type RoleDataSourceModel struct {
 	Id      types.String `tfsdk:"id"`
-	Actions types.List   `tfsdk:"actions"`
+	Actions types.Set    `tfsdk:"actions"`
 }
 
 func (d *RoleDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -45,7 +46,7 @@ func (d *RoleDataSource) Schema(ctx context.Context, req datasource.SchemaReques
 				MarkdownDescription: "Role identifier",
 				Required:            true,
 			},
-			"actions": schema.ListAttribute{
+			"actions": schema.SetAttribute{
 				MarkdownDescription: "List of actions associated with the role",
 				ElementType:         types.StringType,
 				Computed:            true,
@@ -99,19 +100,10 @@ func (d *RoleDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 	}
 	tflog.Trace(ctx, "GetRole response", map[string]interface{}{"role": role})
 
-	actions := make([]string, 0, len(role.Role.Actions))
-	for _, action := range role.Role.Actions {
-		actions = append(actions, common.Action_name[int32(action)])
-	}
+	data.Actions = convertArrayToSetGetter(role.Role.Actions, func(a common.Action) string {
+		return strings.ToLower(strings.ReplaceAll(common.Action_name[int32(a)], "ACTION_", ""))
+	})
 
-	// Convert []string → types.List
-	listValue, diag := types.ListValueFrom(ctx, types.StringType, actions)
-	resp.Diagnostics.Append(diag...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	data.Actions = listValue
 	// Write logs using the tflog package
 	// Documentation: https://terraform.io/plugin/log
 	tflog.Trace(ctx, "read a data source")
