@@ -71,15 +71,15 @@ func (d *PolicyDataSource) Schema(ctx context.Context, req datasource.SchemaRequ
 							Attributes: map[string]schema.Attribute{
 								"org_id": schema.StringAttribute{
 									MarkdownDescription: "Org identifier",
-									Computed:            true,
+									Optional:            true,
 								},
 								"domain_id": schema.StringAttribute{
 									MarkdownDescription: "Domain identifier",
-									Computed:            true,
+									Optional:            true,
 								},
 								"project_id": schema.StringAttribute{
 									MarkdownDescription: "Project identifier",
-									Computed:            true,
+									Optional:            true,
 								},
 							},
 						},
