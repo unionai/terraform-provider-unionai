@@ -1,5 +1,5 @@
 resource "unionai_api_key" "example" {
-  id = "my-key"
+  id = "my-key2"
 }
 
 output "api_key_id" {
