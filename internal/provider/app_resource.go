@@ -3,7 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
-	"math/rand"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -11,7 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/unionai/cloud/gen/pb-go/identity"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -24,25 +24,27 @@ func NewAppResource() resource.Resource {
 
 // AppResource defines the resource implementation.
 type AppResource struct {
+	conn identity.AppsServiceClient
+	org  string
 }
 
 // AppResourceModel describes the resource data model.
 type AppResourceModel struct {
-	Id                      types.String   `tfsdk:"id"`
-	ClientId                types.String   `tfsdk:"client_id"`
-	ClientName              types.String   `tfsdk:"client_name"`
-	ClientUri               types.String   `tfsdk:"client_uri"`
-	ConsentMethod           types.String   `tfsdk:"consent_method"`
-	Contacts                []types.String `tfsdk:"contacts"`
-	GrantTypes              []types.String `tfsdk:"grant_types"`
-	JwksUri                 types.String   `tfsdk:"jwks_uri"`
-	LogoUri                 types.String   `tfsdk:"logo_uri"`
-	PolicyUri               types.String   `tfsdk:"policy_uri"`
-	RedirectUris            []types.String `tfsdk:"redirect_uris"`
-	ResponseTypes           []types.String `tfsdk:"response_types"`
-	TokenEndpointAuthMethod types.String   `tfsdk:"token_endpoint_auth_method"`
-	TosUri                  types.String   `tfsdk:"tos_uri"`
-	Secret                  types.String   `tfsdk:"secret"`
+	Id                      types.String `tfsdk:"id"`
+	ClientId                types.String `tfsdk:"client_id"`
+	ClientName              types.String `tfsdk:"client_name"`
+	ClientUri               types.String `tfsdk:"client_uri"`
+	ConsentMethod           types.String `tfsdk:"consent_method"`
+	Contacts                types.Set    `tfsdk:"contacts"`
+	GrantTypes              types.Set    `tfsdk:"grant_types"`
+	JwksUri                 types.String `tfsdk:"jwks_uri"`
+	LogoUri                 types.String `tfsdk:"logo_uri"`
+	PolicyUri               types.String `tfsdk:"policy_uri"`
+	RedirectUris            types.Set    `tfsdk:"redirect_uris"`
+	ResponseTypes           types.Set    `tfsdk:"response_types"`
+	TokenEndpointAuthMethod types.String `tfsdk:"token_endpoint_auth_method"`
+	TosUri                  types.String `tfsdk:"tos_uri"`
+	Secret                  types.String `tfsdk:"secret"`
 }
 
 func (r *AppResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -58,15 +60,12 @@ func (r *AppResource) Schema(ctx context.Context, req resource.SchemaRequest, re
 			"id": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "Application identifier",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"client_id": schema.StringAttribute{
 				Required:            true,
 				MarkdownDescription: "Application identifier",
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"client_name": schema.StringAttribute{
@@ -81,12 +80,12 @@ func (r *AppResource) Schema(ctx context.Context, req resource.SchemaRequest, re
 				Optional:            true,
 				MarkdownDescription: "Consent method used by the application",
 			},
-			"contacts": schema.ListAttribute{
+			"contacts": schema.SetAttribute{
 				ElementType:         types.StringType,
 				Optional:            true,
 				MarkdownDescription: "List of contacts for the application",
 			},
-			"grant_types": schema.ListAttribute{
+			"grant_types": schema.SetAttribute{
 				ElementType:         types.StringType,
 				Optional:            true,
 				MarkdownDescription: "List of OAuth 2.0 grant types the application may use",
@@ -103,12 +102,12 @@ func (r *AppResource) Schema(ctx context.Context, req resource.SchemaRequest, re
 				Optional:            true,
 				MarkdownDescription: "URI that the application provides to the end-user to read about how the profile data will be used",
 			},
-			"redirect_uris": schema.ListAttribute{
+			"redirect_uris": schema.SetAttribute{
 				ElementType:         types.StringType,
 				Optional:            true,
 				MarkdownDescription: "List of redirect URIs for the application",
 			},
-			"response_types": schema.ListAttribute{
+			"response_types": schema.SetAttribute{
 				ElementType:         types.StringType,
 				Optional:            true,
 				MarkdownDescription: "List of OAuth 2.0 response types the application may use",
@@ -139,7 +138,7 @@ func (r *AppResource) Configure(ctx context.Context, req resource.ConfigureReque
 		return
 	}
 
-	_, ok := req.ProviderData.(*providerContext)
+	client, ok := req.ProviderData.(*providerContext)
 
 	if !ok {
 		resp.Diagnostics.AddError(
@@ -149,6 +148,16 @@ func (r *AppResource) Configure(ctx context.Context, req resource.ConfigureReque
 
 		return
 	}
+
+	r.conn = identity.NewAppsServiceClient(client.conn)
+	if r.conn == nil {
+		resp.Diagnostics.AddError(
+			"Unexpected Resource Configure Type",
+			fmt.Sprintf("Expected *identity.AppsServiceClient, got: %T. Please report this issue to the provider developers.", r.conn),
+		)
+		return
+	}
+	r.org = client.org
 }
 
 func (r *AppResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -163,12 +172,85 @@ func (r *AppResource) Create(ctx context.Context, req resource.CreateRequest, re
 
 	data.Id = data.ClientId // Our ID will match the client ID which is unique
 
-	// Fake secret. Replace with real one
-	data.Secret = types.StringValue(fmt.Sprintf("fake-%d", rand.Int63()))
+	if _, err := r.conn.Get(ctx, &identity.GetAppRequest{
+		Organization: r.org,
+		ClientId:     data.ClientId.ValueString(),
+	}); err == nil {
+		resp.Diagnostics.AddError(
+			"Application already exists",
+			fmt.Sprintf("Application with client ID %s already exists", data.ClientId.ValueString()),
+		)
+		return
+	}
 
-	// Write logs using the tflog package
-	// Documentation: https://terraform.io/plugin/log
-	tflog.Trace(ctx, "created a resource")
+	createRequest := &identity.CreateAppRequest{
+		Organization: r.org,
+		ClientId:     data.ClientId.ValueString(),
+		ClientName:   data.ClientName.ValueString(),
+		ClientUri:    data.ClientUri.ValueString(),
+		Contacts:     convertSetToStrings(data.Contacts),
+		JwksUri:      data.JwksUri.ValueString(),
+		LogoUri:      data.LogoUri.ValueString(),
+		PolicyUri:    data.PolicyUri.ValueString(),
+		RedirectUris: convertSetToStrings(data.RedirectUris),
+		TosUri:       data.TosUri.ValueString(),
+	}
+
+	if consent, ok := identity.ConsentMethod_value[strings.ToUpper(data.ConsentMethod.ValueString())]; !ok {
+		resp.Diagnostics.AddError(
+			"Invalid Consent Method",
+			fmt.Sprintf("Invalid consent method: %s", data.ConsentMethod.ValueString()),
+		)
+		return
+	} else {
+		createRequest.ConsentMethod = identity.ConsentMethod(consent)
+	}
+
+	for _, grantType := range convertSetToStrings(data.GrantTypes) {
+		grant, ok := identity.GrantTypes_value[strings.ToUpper(grantType)]
+		if !ok {
+			resp.Diagnostics.AddError(
+				"Invalid Grant Type",
+				fmt.Sprintf("Invalid grant type: %s", grantType),
+			)
+			return
+		}
+		createRequest.GrantTypes = append(createRequest.GrantTypes, identity.GrantTypes(grant))
+	}
+
+	for _, responseType := range convertSetToStrings(data.ResponseTypes) {
+		response, ok := identity.ResponseTypes_value[strings.ToUpper(responseType)]
+		if !ok {
+			resp.Diagnostics.AddError(
+				"Invalid Response Type",
+				fmt.Sprintf("Invalid response type: %s", responseType),
+			)
+			return
+		}
+		createRequest.ResponseTypes = append(createRequest.ResponseTypes, identity.ResponseTypes(response))
+	}
+
+	tokenEndpointAuthMethod, ok := identity.TokenEndpointAuthMethod_value[strings.ToUpper(data.TokenEndpointAuthMethod.ValueString())]
+	if !ok {
+		resp.Diagnostics.AddError(
+			"Invalid Token Endpoint Auth Method",
+			fmt.Sprintf("Invalid token endpoint auth method: %s", data.TokenEndpointAuthMethod.ValueString()),
+		)
+		return
+	}
+	createRequest.TokenEndpointAuthMethod = identity.TokenEndpointAuthMethod(tokenEndpointAuthMethod)
+
+	app, err := r.conn.Create(ctx, createRequest)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Client Error",
+			fmt.Sprintf("Unable to create oauth app, got error: %s", err),
+		)
+		return
+	}
+
+	// Fake secret. Replace with real one
+	data.Secret = types.StringValue(app.App.ClientSecret)
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -184,14 +266,6 @@ func (r *AppResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		return
 	}
 
-	// If applicable, this is a great opportunity to initialize any necessary
-	// provider client data and make a call using it.
-	// httpResp, err := r.client.Do(httpReq)
-	// if err != nil {
-	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read oauth app, got error: %s", err))
-	//     return
-	// }
-
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -206,13 +280,36 @@ func (r *AppResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
-	// If applicable, this is a great opportunity to initialize any necessary
-	// provider client data and make a call using it.
-	// httpResp, err := r.client.Do(httpReq)
-	// if err != nil {
-	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update oauth app, got error: %s", err))
-	//     return
-	// }
+	app, err := r.conn.Get(ctx, &identity.GetAppRequest{
+		Organization: r.org,
+		ClientId:     data.Id.ValueString(),
+	})
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error Reading UnionAI Application",
+			fmt.Sprintf("Error reading UnionAI Application %s: %s", data.Id.ValueString(), err),
+		)
+		return
+	}
+
+	data.ClientId = types.StringValue(app.App.ClientId)
+	data.ClientName = types.StringValue(app.App.ClientName)
+	data.ClientUri = types.StringValue(app.App.ClientUri)
+	data.Contacts = convertStringsToSet(app.App.Contacts)
+	data.GrantTypes = convertArrayToSetGetter(app.App.GrantTypes, func(g identity.GrantTypes) string {
+		return identity.GrantTypes_name[int32(g)]
+	})
+	data.JwksUri = types.StringValue(app.App.JwksUri)
+	data.LogoUri = types.StringValue(app.App.LogoUri)
+	data.PolicyUri = types.StringValue(app.App.PolicyUri)
+	data.RedirectUris = convertStringsToSet(app.App.RedirectUris)
+	data.ResponseTypes = convertArrayToSetGetter(app.App.ResponseTypes, func(r identity.ResponseTypes) string {
+		return identity.ResponseTypes_name[int32(r)]
+	})
+	data.TokenEndpointAuthMethod = types.StringValue(identity.TokenEndpointAuthMethod_name[int32(app.App.TokenEndpointAuthMethod)])
+	data.TosUri = types.StringValue(app.App.TosUri)
+
+	data.Secret = types.StringValue(app.App.ClientSecret)
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -228,13 +325,17 @@ func (r *AppResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 		return
 	}
 
-	// If applicable, this is a great opportunity to initialize any necessary
-	// provider client data and make a call using it.
-	// httpResp, err := r.client.Do(httpReq)
-	// if err != nil {
-	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete oauth app, got error: %s", err))
-	//     return
-	// }
+	_, err := r.conn.Delete(ctx, &identity.DeleteAppRequest{
+		Organization: r.org,
+		ClientId:     data.Id.ValueString(),
+	})
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error Deleting UnionAI Application",
+			fmt.Sprintf("Error deleting UnionAI Application %s: %s", data.Id.ValueString(), err),
+		)
+		return
+	}
 }
 
 func (r *AppResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

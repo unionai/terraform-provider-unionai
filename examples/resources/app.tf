@@ -1,6 +1,6 @@
 resource "unionai_application" "myapp" {
-  client_id      = "dummy-client-name"
-  client_name    = "dummy client name"
+  client_id      = "my-app"
+  client_name    = "My Application"
   client_uri     = "https://dummyclienturi"
   consent_method = "CONSENT_METHOD_REQUIRED"
   contacts = [

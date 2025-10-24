@@ -1,5 +1,5 @@
 data "unionai_application" "myapp" {
-  id = "tryv2-uctl"
+  id = "tryv2-flyteadmin"
 }
 
 output "app" {

@@ -26,11 +26,11 @@ type ProjectDataSource struct {
 
 // ProjectDataSourceModel describes the data source data model.
 type ProjectDataSourceModel struct {
-	Id          types.String   `tfsdk:"id"`
-	Name        types.String   `tfsdk:"name"`
-	Description types.String   `tfsdk:"description"`
-	DomainIds   []types.String `tfsdk:"domain_ids"`
-	State       types.String   `tfsdk:"state"`
+	Id          types.String `tfsdk:"id"`
+	Name        types.String `tfsdk:"name"`
+	Description types.String `tfsdk:"description"`
+	DomainIds   types.Set    `tfsdk:"domain_ids"`
+	State       types.String `tfsdk:"state"`
 }
 
 func (d *ProjectDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -55,7 +55,7 @@ func (d *ProjectDataSource) Schema(ctx context.Context, req datasource.SchemaReq
 				MarkdownDescription: "Project description",
 				Computed:            true,
 			},
-			"domain_ids": schema.ListAttribute{
+			"domain_ids": schema.SetAttribute{
 				MarkdownDescription: "Project domain identifiers",
 				Computed:            true,
 				ElementType:         types.StringType,
@@ -130,10 +130,7 @@ func (d *ProjectDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	} else {
 		data.Description = types.StringNull()
 	}
-	data.DomainIds = make([]types.String, 0, len(project.Domains))
-	for _, domain := range project.Domains {
-		data.DomainIds = append(data.DomainIds, types.StringValue(domain.Id))
-	}
+	data.DomainIds = convertArrayToSetGetter(project.Domains, func(domain *admin.Domain) string { return domain.Id })
 	data.State = types.StringValue(admin.Project_ProjectState_name[int32(project.State)])
 
 	// Save data into Terraform state

@@ -26,7 +26,7 @@ type DataplanesDataSource struct {
 
 // DataplanesDataSourceModel describes the data source data model.
 type DataplanesDataSourceModel struct {
-	Ids types.List `tfsdk:"ids"`
+	Ids types.Set `tfsdk:"ids"`
 }
 
 func (d *DataplanesDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -39,7 +39,7 @@ func (d *DataplanesDataSource) Schema(ctx context.Context, req datasource.Schema
 		MarkdownDescription: "Dataplanes data source",
 
 		Attributes: map[string]schema.Attribute{
-			"ids": schema.ListAttribute{
+			"ids": schema.SetAttribute{
 				MarkdownDescription: "List of dataplane IDs",
 				Computed:            true,
 				ElementType:         types.StringType,
@@ -99,7 +99,7 @@ func (d *DataplanesDataSource) Read(ctx context.Context, req datasource.ReadRequ
 	for _, c := range clusters.Clusters {
 		idValues = append(idValues, types.StringValue(c.Spec.Id.Name))
 	}
-	data.Ids = types.ListValueMust(types.StringType, idValues)
+	data.Ids = types.SetValueMust(types.StringType, idValues)
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
