@@ -2,9 +2,8 @@ package provider
 
 import (
 	"context"
-	"crypto/rand"
+	"encoding/base64"
 	"fmt"
-	"math/big"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -12,7 +11,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/unionai/cloud/gen/pb-go/identity"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -24,7 +25,11 @@ func NewApiKeyResource() resource.Resource {
 }
 
 // ApiKeyResource defines the resource implementation.
-type ApiKeyResource struct{}
+type ApiKeyResource struct {
+	conn identity.AppsServiceClient
+	org  string
+	host string
+}
 
 // ApiKeyResourceModel describes the resource data model.
 type ApiKeyResourceModel struct {
@@ -45,6 +50,9 @@ func (r *ApiKeyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 			"id": schema.StringAttribute{
 				Required:            true,
 				MarkdownDescription: "API key identifier",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"secret": schema.StringAttribute{
 				Computed:            true,
@@ -64,7 +72,7 @@ func (r *ApiKeyResource) Configure(ctx context.Context, req resource.ConfigureRe
 		return
 	}
 
-	_, ok := req.ProviderData.(*providerContext)
+	client, ok := req.ProviderData.(*providerContext)
 
 	if !ok {
 		resp.Diagnostics.AddError(
@@ -74,6 +82,17 @@ func (r *ApiKeyResource) Configure(ctx context.Context, req resource.ConfigureRe
 
 		return
 	}
+
+	r.conn = identity.NewAppsServiceClient(client.conn)
+	if r.conn == nil {
+		resp.Diagnostics.AddError(
+			"Unexpected Resource Configure Type",
+			fmt.Sprintf("Expected *identity.AppsServiceClient, got: %T. Please report this issue to the provider developers.", r.conn),
+		)
+		return
+	}
+	r.org = client.org
+	r.host = client.host
 }
 
 func (r *ApiKeyResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -86,13 +105,29 @@ func (r *ApiKeyResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
-	// For the purposes of this example code, hardcoding a response value to
-	// save into the Terraform state.
-	data.Secret = types.StringValue(generateRandomString(32))
+	createRequest := &identity.CreateAppRequest{
+		Organization:            r.org,
+		ClientId:                data.Id.ValueString(),
+		ClientName:              data.Id.ValueString(),
+		ConsentMethod:           identity.ConsentMethod_CONSENT_METHOD_REQUIRED,
+		GrantTypes:              []identity.GrantTypes{identity.GrantTypes_CLIENT_CREDENTIALS, identity.GrantTypes_AUTHORIZATION_CODE},
+		ResponseTypes:           []identity.ResponseTypes{identity.ResponseTypes_CODE},
+		TokenEndpointAuthMethod: identity.TokenEndpointAuthMethod_CLIENT_SECRET_BASIC,
+		RedirectUris:            []string{"http://localhost:8080/authorization-code/callback"},
+	}
 
-	// Write logs using the tflog package
-	// Documentation: https://terraform.io/plugin/log
-	tflog.Trace(ctx, "created a resource")
+	app, err := r.conn.Create(ctx, createRequest)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Client Error",
+			fmt.Sprintf("Unable to create oauth app, got error: %s", err),
+		)
+		return
+	}
+
+	// Encode the secret. Base64 of <endpoint>:<client_id>:<client_secret>:None
+	secret := fmt.Sprintf("%s:%s:%s:None", r.host, app.App.ClientId, app.App.ClientSecret)
+	data.Secret = types.StringValue(base64.StdEncoding.EncodeToString([]byte(secret)))
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -105,6 +140,23 @@ func (r *ApiKeyResource) Read(ctx context.Context, req resource.ReadRequest, res
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	_, err := r.conn.Get(ctx, &identity.GetAppRequest{
+		Organization: r.org,
+		ClientId:     data.Id.ValueString(),
+	})
+	if err != nil {
+		// Catch gRPC error if the API key is not found
+		if status.Code(err) == codes.NotFound {
+			resp.State.RemoveResource(ctx)
+			return
+		}
+		resp.Diagnostics.AddError(
+			"Error Reading UnionAI API key",
+			fmt.Sprintf("Error reading UnionAI API key %s: %s", data.Id.ValueString(), err),
+		)
 		return
 	}
 
@@ -135,25 +187,20 @@ func (r *ApiKeyResource) Delete(ctx context.Context, req resource.DeleteRequest,
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	_, err := r.conn.Delete(ctx, &identity.DeleteAppRequest{
+		Organization: r.org,
+		ClientId:     data.Id.ValueString(),
+	})
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error Deleting UnionAI API key",
+			fmt.Sprintf("Error deleting UnionAI API key %s: %s", data.Id.ValueString(), err),
+		)
+		return
+	}
 }
 
 func (r *ApiKeyResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
-}
-
-// generateRandomString returns a securely generated random alphanumeric string of length n.
-// It uses crypto/rand to ensure cryptographic randomness.
-func generateRandomString(n int) string {
-	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	b := make([]byte, n)
-	for i := 0; i < n; i++ {
-		rnd, err := rand.Int(rand.Reader, big.NewInt(int64(len(letters))))
-		if err != nil {
-			// In the unlikely event of an error, fall back to 'a'
-			b[i] = 'a'
-			continue
-		}
-		b[i] = letters[rnd.Int64()]
-	}
-	return string(b)
 }
