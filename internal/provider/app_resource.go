@@ -266,20 +266,6 @@ func (r *AppResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		return
 	}
 
-	// Save updated data into Terraform state
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
-}
-
-func (r *AppResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var data AppResourceModel
-
-	// Read Terraform plan data into the model
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
-
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
 	app, err := r.conn.Get(ctx, &identity.GetAppRequest{
 		Organization: r.org,
 		ClientId:     data.Id.ValueString(),
@@ -310,6 +296,78 @@ func (r *AppResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	data.TosUri = types.StringValue(app.App.TosUri)
 
 	data.Secret = types.StringValue(app.App.ClientSecret)
+
+	// Save updated data into Terraform state
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+}
+
+func (r *AppResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	var data AppResourceModel
+
+	// Read Terraform plan data into the model
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	updateRequest := &identity.UpdateAppRequest{
+		Organization: r.org,
+		ClientId:     data.ClientId.ValueString(),
+		ClientName:   data.ClientName.ValueString(),
+		ClientUri:    data.ClientUri.ValueString(),
+		Contacts:     convertSetToStrings(data.Contacts),
+		JwksUri:      data.JwksUri.ValueString(),
+		LogoUri:      data.LogoUri.ValueString(),
+		PolicyUri:    data.PolicyUri.ValueString(),
+		RedirectUris: convertSetToStrings(data.RedirectUris),
+		TosUri:       data.TosUri.ValueString(),
+	}
+
+	for _, grantType := range convertSetToStrings(data.GrantTypes) {
+		grant, ok := identity.GrantTypes_value[strings.ToUpper(grantType)]
+		if !ok {
+			resp.Diagnostics.AddError(
+				"Invalid Grant Type",
+				fmt.Sprintf("Invalid grant type: %s", grantType),
+			)
+			return
+		}
+		updateRequest.GrantTypes = append(updateRequest.GrantTypes, identity.GrantTypes(grant))
+	}
+
+	for _, responseType := range convertSetToStrings(data.ResponseTypes) {
+		response, ok := identity.ResponseTypes_value[strings.ToUpper(responseType)]
+		if !ok {
+			resp.Diagnostics.AddError(
+				"Invalid Response Type",
+				fmt.Sprintf("Invalid response type: %s", responseType),
+			)
+			return
+		}
+		updateRequest.ResponseTypes = append(updateRequest.ResponseTypes, identity.ResponseTypes(response))
+	}
+
+	tokenEndpointAuthMethod, ok := identity.TokenEndpointAuthMethod_value[strings.ToUpper(data.TokenEndpointAuthMethod.ValueString())]
+	if !ok {
+		resp.Diagnostics.AddError(
+			"Invalid Token Endpoint Auth Method",
+			fmt.Sprintf("Invalid token endpoint auth method: %s", data.TokenEndpointAuthMethod.ValueString()),
+		)
+		return
+	}
+	updateRequest.TokenEndpointAuthMethod = identity.TokenEndpointAuthMethod(tokenEndpointAuthMethod)
+
+	_, err := r.conn.Update(ctx, updateRequest)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Client Error",
+			fmt.Sprintf("Unable to update oauth app, got error: %s", err),
+		)
+		return
+	}
+
+	data.Id = data.ClientId
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
