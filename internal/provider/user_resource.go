@@ -10,7 +10,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/unionai/cloud/gen/pb-go/common"
+	"github.com/unionai/cloud/gen/pb-go/identity"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -23,6 +26,8 @@ func NewUserResource() resource.Resource {
 
 // UserResource defines the resource implementation.
 type UserResource struct {
+	conn identity.UserServiceClient
+	org  string
 }
 
 // UserResourceModel describes the resource data model.
@@ -53,14 +58,23 @@ func (r *UserResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 			"first_name": schema.StringAttribute{
 				MarkdownDescription: "User first name",
 				Required:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"last_name": schema.StringAttribute{
 				MarkdownDescription: "User last name",
 				Required:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"email": schema.StringAttribute{
 				MarkdownDescription: "User email",
 				Required:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 		},
 	}
@@ -72,16 +86,26 @@ func (r *UserResource) Configure(ctx context.Context, req resource.ConfigureRequ
 		return
 	}
 
-	_, ok := req.ProviderData.(*providerContext)
+	client, ok := req.ProviderData.(*providerContext)
 
 	if !ok {
 		resp.Diagnostics.AddError(
-			"Unexpected Resource Configure Type",
+			"Unexpected Data Source Configure Type",
 			fmt.Sprintf("Expected *providerContext, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 
 		return
 	}
+
+	r.conn = identity.NewUserServiceClient(client.conn)
+	if r.conn == nil {
+		resp.Diagnostics.AddError(
+			"Unexpected Data Source Configure Type",
+			fmt.Sprintf("Expected *identity.UserServiceClient, got: %T. Please report this issue to the provider developers.", r.conn),
+		)
+		return
+	}
+	r.org = client.org
 }
 
 func (r *UserResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -94,21 +118,23 @@ func (r *UserResource) Create(ctx context.Context, req resource.CreateRequest, r
 		return
 	}
 
-	// If applicable, this is a great opportunity to initialize any necessary
-	// provider client data and make a call using it.
-	// httpResp, err := r.client.Do(httpReq)
-	// if err != nil {
-	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create user, got error: %s", err))
-	//     return
-	// }
+	user, err := r.conn.CreateUser(ctx, &identity.CreateUserRequest{
+		Spec: &common.UserSpec{
+			Organization: r.org,
+			FirstName:    data.FirstName.ValueString(),
+			LastName:     data.LastName.ValueString(),
+			Email:        data.Email.ValueString(),
+		},
+	})
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error Creating User",
+			fmt.Sprintf("Could not create user, unexpected error: %s", err.Error()),
+		)
+		return
+	}
 
-	// For the purposes of this example code, hardcoding a response value to
-	// save into the Terraform state.
-	data.Id = types.StringValue("user-id")
-
-	// Write logs using the tflog package
-	// Documentation: https://terraform.io/plugin/log
-	tflog.Trace(ctx, "created a resource")
+	data.Id = types.StringValue(user.Id.Subject)
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -124,13 +150,27 @@ func (r *UserResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 
-	// If applicable, this is a great opportunity to initialize any necessary
-	// provider client data and make a call using it.
-	// httpResp, err := r.client.Do(httpReq)
-	// if err != nil {
-	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read user, got error: %s", err))
-	//     return
-	// }
+	user, err := r.conn.GetUser(ctx, &identity.GetUserRequest{
+		Id: &common.UserIdentifier{
+			Subject: data.Id.ValueString(),
+		},
+	})
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			// User has been deleted outside of Terraform, remove from state
+			resp.State.RemoveResource(ctx)
+			return
+		}
+		resp.Diagnostics.AddError(
+			"Error Reading User",
+			fmt.Sprintf("Could not read user, unexpected error: %s", err.Error()),
+		)
+		return
+	}
+
+	data.FirstName = types.StringValue(user.User.Spec.FirstName)
+	data.LastName = types.StringValue(user.User.Spec.LastName)
+	data.Email = types.StringValue(user.User.Spec.Email)
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -145,14 +185,6 @@ func (r *UserResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
-	// If applicable, this is a great opportunity to initialize any necessary
-	// provider client data and make a call using it.
-	// httpResp, err := r.client.Do(httpReq)
-	// if err != nil {
-	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update user, got error: %s", err))
-	//     return
-	// }
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

@@ -29,9 +29,7 @@ type AppDataSourceModel struct {
 	ClientId                types.String `tfsdk:"client_id"`
 	ClientName              types.String `tfsdk:"client_name"`
 	ClientUri               types.String `tfsdk:"client_uri"`
-	Contacts                types.Set    `tfsdk:"contacts"`
 	GrantTypes              types.Set    `tfsdk:"grant_types"`
-	JwksUri                 types.String `tfsdk:"jwks_uri"`
 	LogoUri                 types.String `tfsdk:"logo_uri"`
 	PolicyUri               types.String `tfsdk:"policy_uri"`
 	RedirectUris            types.Set    `tfsdk:"redirect_uris"`
@@ -67,19 +65,10 @@ func (d *AppDataSource) Schema(ctx context.Context, req datasource.SchemaRequest
 				Computed:            true,
 				MarkdownDescription: "URI of the application",
 			},
-			"contacts": schema.SetAttribute{
-				ElementType:         types.StringType,
-				Computed:            true,
-				MarkdownDescription: "List of contacts for the application",
-			},
 			"grant_types": schema.SetAttribute{
 				ElementType:         types.StringType,
 				Computed:            true,
 				MarkdownDescription: "List of OAuth 2.0 grant types the application may use",
-			},
-			"jwks_uri": schema.StringAttribute{
-				Computed:            true,
-				MarkdownDescription: "URI for the application's JSON Web Key Set",
 			},
 			"logo_uri": schema.StringAttribute{
 				Computed:            true,
@@ -169,11 +158,9 @@ func (d *AppDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 	data.ClientId = types.StringValue(app.App.ClientId)
 	data.ClientName = types.StringValue(app.App.ClientName)
 	data.ClientUri = types.StringValue(app.App.ClientUri)
-	data.Contacts = convertStringsToSet(app.App.Contacts)
 	data.GrantTypes = convertArrayToSetGetter(app.App.GrantTypes, func(g identity.GrantTypes) string {
 		return identity.GrantTypes_name[int32(g)]
 	})
-	data.JwksUri = types.StringValue(app.App.JwksUri)
 	data.LogoUri = types.StringValue(app.App.LogoUri)
 	data.PolicyUri = types.StringValue(app.App.PolicyUri)
 	data.RedirectUris = convertStringsToSet(app.App.RedirectUris)
