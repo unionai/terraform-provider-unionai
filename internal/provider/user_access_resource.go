@@ -7,8 +7,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/unionai/cloud/gen/pb-go/authorizer"
+	"github.com/unionai/cloud/gen/pb-go/common"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -21,6 +26,8 @@ func NewUserAccessResource() resource.Resource {
 
 // UserAccessResource defines the resource implementation.
 type UserAccessResource struct {
+	conn authorizer.AuthorizerServiceClient
+	org  string
 }
 
 // UserAccessResourceModel describes the resource data model.
@@ -42,10 +49,16 @@ func (r *UserAccessResource) Schema(ctx context.Context, req resource.SchemaRequ
 			"policy": schema.StringAttribute{
 				MarkdownDescription: "Policy identifier",
 				Required:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"user": schema.StringAttribute{
 				MarkdownDescription: "User identifier",
 				Required:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 		},
 	}
@@ -57,7 +70,7 @@ func (r *UserAccessResource) Configure(ctx context.Context, req resource.Configu
 		return
 	}
 
-	_, ok := req.ProviderData.(*providerContext)
+	client, ok := req.ProviderData.(*providerContext)
 
 	if !ok {
 		resp.Diagnostics.AddError(
@@ -67,6 +80,16 @@ func (r *UserAccessResource) Configure(ctx context.Context, req resource.Configu
 
 		return
 	}
+
+	r.conn = authorizer.NewAuthorizerServiceClient(client.conn)
+	if r.conn == nil {
+		resp.Diagnostics.AddError(
+			"Unexpected Resource Configure Type",
+			fmt.Sprintf("Expected *authorizer.AuthorizerServiceClient, got: %T. Please report this issue to the provider developers.", r.conn),
+		)
+		return
+	}
+	r.org = client.org
 }
 
 func (r *UserAccessResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -79,17 +102,29 @@ func (r *UserAccessResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	// If applicable, this is a great opportunity to initialize any necessary
-	// provider client data and make a call using it.
-	// httpResp, err := r.client.Do(httpReq)
-	// if err != nil {
-	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create policy binding, got error: %s", err))
-	//     return
-	// }
-
-	// Write logs using the tflog package
-	// Documentation: https://terraform.io/plugin/log
-	tflog.Trace(ctx, "created a resource")
+	_, err := r.conn.AssignIdentity(ctx, &authorizer.AssignIdentityRequest{
+		Organization: r.org,
+		Identity: &common.Identity{
+			Principal: &common.Identity_UserId{
+				UserId: &common.UserIdentifier{
+					Subject: data.User.ValueString(),
+				},
+			},
+		},
+		Assignment: &authorizer.AssignIdentityRequest_PolicyId{
+			PolicyId: &common.PolicyIdentifier{
+				Name:         data.Policy.ValueString(),
+				Organization: r.org,
+			},
+		},
+	})
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error Creating User Access",
+			fmt.Sprintf("Could not create user access, unexpected error: %s", err.Error()),
+		)
+		return
+	}
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -105,13 +140,28 @@ func (r *UserAccessResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
-	// If applicable, this is a great opportunity to initialize any necessary
-	// provider client data and make a call using it.
-	// httpResp, err := r.client.Do(httpReq)
-	// if err != nil {
-	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read policy binding, got error: %s", err))
-	//     return
-	// }
+	_, err := r.conn.GetIdentityAssignments(ctx, &authorizer.GetIdentityAssignmentRequest{
+		Organization: r.org,
+		Identity: &common.Identity{
+			Principal: &common.Identity_UserId{
+				UserId: &common.UserIdentifier{
+					Subject: data.User.ValueString(),
+				},
+			},
+		},
+	})
+	if err != nil {
+		// Catch gRPC error if the assignment is not found
+		if status.Code(err) == codes.NotFound {
+			resp.State.RemoveResource(ctx)
+			return
+		}
+		resp.Diagnostics.AddError(
+			"Error Reading User Access",
+			fmt.Sprintf("Error reading user access for user %s: %s", data.User.ValueString(), err),
+		)
+		return
+	}
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -127,14 +177,6 @@ func (r *UserAccessResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
-	// If applicable, this is a great opportunity to initialize any necessary
-	// provider client data and make a call using it.
-	// httpResp, err := r.client.Do(httpReq)
-	// if err != nil {
-	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update policy binding, got error: %s", err))
-	//     return
-	// }
-
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -149,13 +191,30 @@ func (r *UserAccessResource) Delete(ctx context.Context, req resource.DeleteRequ
 		return
 	}
 
-	// If applicable, this is a great opportunity to initialize any necessary
-	// provider client data and make a call using it.
-	// httpResp, err := r.client.Do(httpReq)
-	// if err != nil {
-	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete policy binding, got error: %s", err))
-	//     return
-	// }
+	_, err := r.conn.UnassignIdentity(ctx, &authorizer.UnassignIdentityRequest{
+		Organization: r.org,
+		Identity: &common.Identity{
+			Principal: &common.Identity_UserId{
+				UserId: &common.UserIdentifier{
+					Subject: data.User.ValueString(),
+				},
+			},
+		},
+		Assignment: &authorizer.UnassignIdentityRequest_PolicyId{
+			PolicyId: &common.PolicyIdentifier{
+				Name:         data.Policy.ValueString(),
+				Organization: r.org,
+			},
+		},
+	})
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			resp.State.RemoveResource(ctx)
+			return
+		}
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete user access, got error: %s", err))
+		return
+	}
 }
 
 func (r *UserAccessResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
