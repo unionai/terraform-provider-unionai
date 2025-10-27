@@ -35,9 +35,7 @@ type AppResourceModel struct {
 	ClientName              types.String `tfsdk:"client_name"`
 	ClientUri               types.String `tfsdk:"client_uri"`
 	ConsentMethod           types.String `tfsdk:"consent_method"`
-	Contacts                types.Set    `tfsdk:"contacts"`
 	GrantTypes              types.Set    `tfsdk:"grant_types"`
-	JwksUri                 types.String `tfsdk:"jwks_uri"`
 	LogoUri                 types.String `tfsdk:"logo_uri"`
 	PolicyUri               types.String `tfsdk:"policy_uri"`
 	RedirectUris            types.Set    `tfsdk:"redirect_uris"`
@@ -80,19 +78,10 @@ func (r *AppResource) Schema(ctx context.Context, req resource.SchemaRequest, re
 				Optional:            true,
 				MarkdownDescription: "Consent method used by the application",
 			},
-			"contacts": schema.SetAttribute{
-				ElementType:         types.StringType,
-				Optional:            true,
-				MarkdownDescription: "List of contacts for the application",
-			},
 			"grant_types": schema.SetAttribute{
 				ElementType:         types.StringType,
 				Optional:            true,
 				MarkdownDescription: "List of OAuth 2.0 grant types the application may use",
-			},
-			"jwks_uri": schema.StringAttribute{
-				Optional:            true,
-				MarkdownDescription: "URI for the application's JSON Web Key Set",
 			},
 			"logo_uri": schema.StringAttribute{
 				Optional:            true,
@@ -188,8 +177,6 @@ func (r *AppResource) Create(ctx context.Context, req resource.CreateRequest, re
 		ClientId:     data.ClientId.ValueString(),
 		ClientName:   data.ClientName.ValueString(),
 		ClientUri:    data.ClientUri.ValueString(),
-		Contacts:     convertSetToStrings(data.Contacts),
-		JwksUri:      data.JwksUri.ValueString(),
 		LogoUri:      data.LogoUri.ValueString(),
 		PolicyUri:    data.PolicyUri.ValueString(),
 		RedirectUris: convertSetToStrings(data.RedirectUris),
@@ -249,7 +236,6 @@ func (r *AppResource) Create(ctx context.Context, req resource.CreateRequest, re
 		return
 	}
 
-	// Fake secret. Replace with real one
 	data.Secret = types.StringValue(app.App.ClientSecret)
 
 	// Save data into Terraform state
@@ -281,11 +267,9 @@ func (r *AppResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 	data.ClientId = types.StringValue(app.App.ClientId)
 	data.ClientName = types.StringValue(app.App.ClientName)
 	data.ClientUri = types.StringValue(app.App.ClientUri)
-	data.Contacts = convertStringsToSet(app.App.Contacts)
 	data.GrantTypes = convertArrayToSetGetter(app.App.GrantTypes, func(g identity.GrantTypes) string {
 		return identity.GrantTypes_name[int32(g)]
 	})
-	data.JwksUri = types.StringValue(app.App.JwksUri)
 	data.LogoUri = types.StringValue(app.App.LogoUri)
 	data.PolicyUri = types.StringValue(app.App.PolicyUri)
 	data.RedirectUris = convertStringsToSet(app.App.RedirectUris)
@@ -294,8 +278,6 @@ func (r *AppResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 	})
 	data.TokenEndpointAuthMethod = types.StringValue(identity.TokenEndpointAuthMethod_name[int32(app.App.TokenEndpointAuthMethod)])
 	data.TosUri = types.StringValue(app.App.TosUri)
-
-	data.Secret = types.StringValue(app.App.ClientSecret)
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -316,8 +298,6 @@ func (r *AppResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		ClientId:     data.ClientId.ValueString(),
 		ClientName:   data.ClientName.ValueString(),
 		ClientUri:    data.ClientUri.ValueString(),
-		Contacts:     convertSetToStrings(data.Contacts),
-		JwksUri:      data.JwksUri.ValueString(),
 		LogoUri:      data.LogoUri.ValueString(),
 		PolicyUri:    data.PolicyUri.ValueString(),
 		RedirectUris: convertSetToStrings(data.RedirectUris),

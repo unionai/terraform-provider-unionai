@@ -8,9 +8,7 @@ output "app" {
     client_id                  = data.unionai_application.myapp.client_id
     client_name                = data.unionai_application.myapp.client_name
     client_uri                 = data.unionai_application.myapp.client_uri
-    contacts                   = data.unionai_application.myapp.contacts
     grant_types                = data.unionai_application.myapp.grant_types
-    jwks_uri                   = data.unionai_application.myapp.jwks_uri
     logo_uri                   = data.unionai_application.myapp.logo_uri
     policy_uri                 = data.unionai_application.myapp.policy_uri
     redirect_uris              = data.unionai_application.myapp.redirect_uris
