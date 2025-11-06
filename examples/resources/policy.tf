@@ -1,3 +1,7 @@
+data "unionai_policy" "viewer" {
+  id = "viewer"
+}
+
 resource "unionai_policy" "some_service" {
   name = "some-service"
 
@@ -15,7 +19,7 @@ resource "unionai_policy" "some_service" {
 
   #// A specific project + domain(s)
   project {
-    id      = unionai_project.nelson.name
+    id      = unionai_project.test.id
     role_id = unionai_role.example.id
     domains = [
       "staging",

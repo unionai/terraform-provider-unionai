@@ -104,10 +104,6 @@ func (d *RoleDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		return strings.ToLower(strings.ReplaceAll(common.Action_name[int32(a)], "ACTION_", ""))
 	})
 
-	// Write logs using the tflog package
-	// Documentation: https://terraform.io/plugin/log
-	tflog.Trace(ctx, "read a data source")
-
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }

@@ -200,13 +200,18 @@ func (r *UserResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 		return
 	}
 
-	// If applicable, this is a great opportunity to initialize any necessary
-	// provider client data and make a call using it.
-	// httpResp, err := r.client.Do(httpReq)
-	// if err != nil {
-	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete user, got error: %s", err))
-	//     return
-	// }
+	_, err := r.conn.DeleteUser(ctx, &identity.DeleteUserRequest{
+		Id: &common.UserIdentifier{
+			Subject: data.Id.ValueString(),
+		},
+	})
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error Deleting User",
+			fmt.Sprintf("Could not delete user, unexpected error: %s", err.Error()),
+		)
+		return
+	}
 }
 
 func (r *UserResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

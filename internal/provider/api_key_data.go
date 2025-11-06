@@ -7,7 +7,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/unionai/cloud/gen/pb-go/identity"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -19,6 +21,8 @@ func NewApiKeyDataSource() datasource.DataSource {
 
 // ApiKeyDataSource defines the data source implementation.
 type ApiKeyDataSource struct {
+	conn identity.AppsServiceClient
+	org  string
 }
 
 // ApiKeyDataSourceModel describes the data source data model.
@@ -50,7 +54,7 @@ func (d *ApiKeyDataSource) Configure(ctx context.Context, req datasource.Configu
 		return
 	}
 
-	_, ok := req.ProviderData.(*providerContext)
+	client, ok := req.ProviderData.(*providerContext)
 
 	if !ok {
 		resp.Diagnostics.AddError(
@@ -60,6 +64,16 @@ func (d *ApiKeyDataSource) Configure(ctx context.Context, req datasource.Configu
 
 		return
 	}
+
+	d.conn = identity.NewAppsServiceClient(client.conn)
+	if d.conn == nil {
+		resp.Diagnostics.AddError(
+			"Unexpected Data Source Configure Type",
+			fmt.Sprintf("Expected *identity.AppsServiceClient, got: %T. Please report this issue to the provider developers.", d.conn),
+		)
+		return
+	}
+	d.org = client.org
 }
 
 func (d *ApiKeyDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -72,21 +86,18 @@ func (d *ApiKeyDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 		return
 	}
 
-	// If applicable, this is a great opportunity to initialize any necessary
-	// provider client data and make a call using it.
-	// httpResp, err := d.client.Do(httpReq)
-	// if err != nil {
-	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read api key, got error: %s", err))
-	//     return
-	// }
-
-	// For the purposes of this example code, hardcoding a response value to
-	// save into the Terraform state.
-	data.Id = types.StringValue("api-key-id")
-
-	// Write logs using the tflog package
-	// Documentation: https://terraform.io/plugin/log
-	tflog.Trace(ctx, "read a data source")
+	_, err := d.conn.Get(ctx, &identity.GetAppRequest{
+		Organization: d.org,
+		ClientId:     data.Id.ValueString(),
+	})
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			resp.Diagnostics.AddError("API key not found", fmt.Sprintf("API key with ID %s not found", data.Id.ValueString()))
+			return
+		}
+		resp.Diagnostics.AddError("Failed to fetch API key", err.Error())
+		return
+	}
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
