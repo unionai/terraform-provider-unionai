@@ -5,10 +5,15 @@
 Configure the provider by setting the following parameters:
 
     provider "unionai" {
+      allowed_orgs = [
+        "<your-allowed-org>",
+        "...",
+      ]
       api_key = "<your-api-key-goes-here>"
     }
 
-You can also use the environment variable `UNIONAI_API_KEY` to provide the value above.
+You can also use the environment variable `UNIONAI_API_KEY` to provide the value
+above.
 
 ## Credentials
 
@@ -19,6 +24,12 @@ You can use `union` to accomplish that. Ensure you have these settings when
 creating your application:
 
     union create api-key admin --name "<your-api-key-name>"
+
+## Allowed Organizations
+
+To avoid unintended side effects by mixing credentials, you can specify the
+organizations in the provider configuration. The provider will only allow
+operations on resources in the allowed organizations.
 
 ## Developer Setup
 

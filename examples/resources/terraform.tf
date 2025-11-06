@@ -7,7 +7,8 @@ terraform {
   }
 }
 
-# You can also specify environment variables UNIONAI_API_KEY
 provider "unionai" {
-  api_key = "<your-api-key-goes-here>"
+  allowed_orgs = [
+    "tryv2",
+  ]
 }
