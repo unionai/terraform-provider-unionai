@@ -26,7 +26,8 @@ type UnionaiProvider struct {
 
 // UnionaiProviderModel describes the provider data model.
 type UnionaiProviderModel struct {
-	ApiKey types.String `tfsdk:"api_key"`
+	ApiKey      types.String `tfsdk:"api_key"`
+	AllowedOrgs types.Set    `tfsdk:"allowed_orgs"`
 }
 
 type providerContext struct {
@@ -46,6 +47,11 @@ func (p *UnionaiProvider) Schema(ctx context.Context, req provider.SchemaRequest
 			"api_key": schema.StringAttribute{
 				MarkdownDescription: "Unionai API key",
 				Optional:            true, // they can be specified by UNIONAI_API_KEY
+			},
+			"allowed_orgs": schema.SetAttribute{
+				MarkdownDescription: "Unionai allowed orgs",
+				Optional:            true, // they can be specified by UNIONAI_ALLOWED_ORGS
+				ElementType:         types.StringType,
 			},
 		},
 	}
@@ -97,6 +103,24 @@ func (p *UnionaiProvider) Configure(ctx context.Context, req provider.ConfigureR
 	}
 	resp.DataSourceData = client
 	resp.ResourceData = client
+
+	if len(data.AllowedOrgs.Elements()) > 0 {
+		// Check if our org is allowed
+		allowed := false
+		for _, org := range data.AllowedOrgs.Elements() {
+			if org.(types.String).ValueString() == client.org {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			resp.Diagnostics.AddError(
+				"Union.ai org is not allowed",
+				"Union.ai org "+client.org+" is not allowed. Please add it to allowed_orgs attribute.",
+			)
+			return
+		}
+	}
 }
 
 func (p *UnionaiProvider) Resources(ctx context.Context) []func() resource.Resource {

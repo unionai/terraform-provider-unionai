@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -11,10 +12,17 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/unionai/cloud/gen/pb-go/authorizer"
 	"github.com/unionai/cloud/gen/pb-go/common"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
+
+var validDomains = []string{
+	"production",
+	"staging",
+	"development",
+}
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var _ resource.Resource = &PolicyResource{}
@@ -32,19 +40,28 @@ type PolicyResource struct {
 
 // PolicyResourceModel describes the resource data model.
 type PolicyResourceModel struct {
-	Id   types.String      `tfsdk:"id"`
-	Name types.String      `tfsdk:"name"`
-	Role []PolicyRoleBlock `tfsdk:"role"`
+	Id           types.String                `tfsdk:"id"`
+	Name         types.String                `tfsdk:"name"`
+	Description  types.String                `tfsdk:"description"`
+	Organization []PolicyRoleResourceOrg     `tfsdk:"organization"`
+	Project      []PolicyRoleResourceProject `tfsdk:"project"`
+	Domain       []PolicyRoleResourceDomain  `tfsdk:"domain"`
 }
 
-type PolicyRoleBlock struct {
-	Id       types.String       `tfsdk:"id"`
-	Resource PolicyRoleResource `tfsdk:"resource"`
+type PolicyRoleResourceOrg struct {
+	Id     types.String `tfsdk:"id"`
+	RoleId types.String `tfsdk:"role_id"`
 }
 
-type PolicyRoleResource struct {
-	Project types.String `tfsdk:"project"`
-	Domain  types.String `tfsdk:"domain"`
+type PolicyRoleResourceProject struct {
+	Id      types.String `tfsdk:"id"`
+	Domains types.Set    `tfsdk:"domains"`
+	RoleId  types.String `tfsdk:"role_id"`
+}
+
+type PolicyRoleResourceDomain struct {
+	Id     types.String `tfsdk:"id"`
+	RoleId types.String `tfsdk:"role_id"`
 }
 
 func (r *PolicyResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -68,39 +85,88 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
+			"description": schema.StringAttribute{
+				MarkdownDescription: "Policy description",
+				Optional:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
 		},
 
 		Blocks: map[string]schema.Block{
-			"role": schema.SetNestedBlock{
-				MarkdownDescription: "Role configuration",
+			"organization": schema.SetNestedBlock{
+				MarkdownDescription: "Organization configuration",
 				NestedObject: schema.NestedBlockObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
-							MarkdownDescription: "Role ID reference",
+							MarkdownDescription: "Organization ID",
+							Required:            true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.RequiresReplace(),
+							},
+						},
+						"role_id": schema.StringAttribute{
+							MarkdownDescription: "Role ID",
 							Required:            true,
 							PlanModifiers: []planmodifier.String{
 								stringplanmodifier.RequiresReplace(),
 							},
 						},
 					},
-					Blocks: map[string]schema.Block{
-						"resource": schema.SingleNestedBlock{
-							MarkdownDescription: "Resource scope",
-							Attributes: map[string]schema.Attribute{
-								"project": schema.StringAttribute{
-									MarkdownDescription: "Project name",
-									Optional:            true,
-									PlanModifiers: []planmodifier.String{
-										stringplanmodifier.RequiresReplace(),
-									},
-								},
-								"domain": schema.StringAttribute{
-									MarkdownDescription: "Domain name",
-									Optional:            true,
-									PlanModifiers: []planmodifier.String{
-										stringplanmodifier.RequiresReplace(),
-									},
-								},
+				},
+				PlanModifiers: []planmodifier.Set{
+					setplanmodifier.RequiresReplace(),
+				},
+			},
+			"project": schema.SetNestedBlock{
+				MarkdownDescription: "Project configuration",
+				NestedObject: schema.NestedBlockObject{
+					Attributes: map[string]schema.Attribute{
+						"id": schema.StringAttribute{
+							MarkdownDescription: "Project ID",
+							Required:            true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.RequiresReplace(),
+							},
+						},
+						"domains": schema.SetAttribute{
+							MarkdownDescription: "Domain IDs",
+							Required:            true,
+							ElementType:         types.StringType,
+							PlanModifiers: []planmodifier.Set{
+								setplanmodifier.RequiresReplace(),
+							},
+						},
+						"role_id": schema.StringAttribute{
+							MarkdownDescription: "Role ID",
+							Required:            true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.RequiresReplace(),
+							},
+						},
+					},
+				},
+				PlanModifiers: []planmodifier.Set{
+					setplanmodifier.RequiresReplace(),
+				},
+			},
+			"domain": schema.SetNestedBlock{
+				MarkdownDescription: "Domain configuration",
+				NestedObject: schema.NestedBlockObject{
+					Attributes: map[string]schema.Attribute{
+						"id": schema.StringAttribute{
+							MarkdownDescription: "Domain ID",
+							Required:            true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.RequiresReplace(),
+							},
+						},
+						"role_id": schema.StringAttribute{
+							MarkdownDescription: "Role ID",
+							Required:            true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.RequiresReplace(),
 							},
 						},
 					},
@@ -151,21 +217,105 @@ func (r *PolicyResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
-	// If applicable, this is a great opportunity to initialize any necessary
-	// provider client data and make a call using it.
-	// httpResp, err := r.client.Do(httpReq)
-	// if err != nil {
-	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create policy, got error: %s", err))
-	//     return
-	// }
+	bindings := make([]*common.PolicyBinding, 0)
 
-	// For the purposes of this example code, hardcoding a response value to
-	// save into the Terraform state.
-	data.Id = types.StringValue("policy-id")
+	for _, org := range data.Organization {
+		bindings = append(bindings, &common.PolicyBinding{
+			RoleId: &common.RoleIdentifier{
+				Name:         org.RoleId.ValueString(),
+				Organization: r.org,
+			},
+			Resource: &common.Resource{
+				Resource: &common.Resource_Organization{
+					Organization: &common.Organization{
+						Name: org.Id.ValueString(),
+					},
+				},
+			},
+		})
+	}
 
-	// Write logs using the tflog package
-	// Documentation: https://terraform.io/plugin/log
-	tflog.Trace(ctx, "created a resource")
+	for _, domain := range data.Domain {
+		bindings = append(bindings, &common.PolicyBinding{
+			RoleId: &common.RoleIdentifier{
+				Name:         domain.RoleId.ValueString(),
+				Organization: r.org,
+			},
+			Resource: &common.Resource{
+				Resource: &common.Resource_Domain{
+					Domain: &common.Domain{
+						Name: domain.Id.ValueString(),
+						Organization: &common.Organization{
+							Name: r.org,
+						},
+					},
+				},
+			},
+		})
+	}
+
+	for _, project := range data.Project {
+		for _, domain := range project.Domains.Elements() {
+			if !slices.Contains(validDomains, domain.(types.String).ValueString()) {
+				resp.Diagnostics.AddError("Invalid Domain",
+					fmt.Sprintf("Domain %s is not valid. Must be one of %v", domain.(types.String).ValueString(), validDomains))
+				return
+			}
+			bindings = append(bindings, &common.PolicyBinding{
+				RoleId: &common.RoleIdentifier{
+					Name:         project.RoleId.ValueString(),
+					Organization: r.org,
+				},
+				Resource: &common.Resource{
+					Resource: &common.Resource_Project{
+						Project: &common.Project{
+							Name: project.Id.ValueString(),
+							Domain: &common.Domain{
+								Name: domain.(types.String).ValueString(),
+								Organization: &common.Organization{
+									Name: r.org,
+								},
+							},
+						},
+					},
+				},
+			})
+		}
+	}
+
+	if len(bindings) == 0 {
+		resp.Diagnostics.AddError("Invalid Resource Scope",
+			"Policy must have at least one resource scope (organization, project, or domain).")
+		return
+	}
+
+	if _, err := r.conn.CreatePolicy(ctx, &authorizer.CreatePolicyRequest{
+		Policy: &common.Policy{
+			Id: &common.PolicyIdentifier{
+				Name:         data.Name.ValueString(),
+				Organization: r.org,
+			},
+			Description: data.Description.ValueString(),
+			Bindings:    bindings,
+		},
+	}); err != nil {
+		if status.Code(err) == codes.Internal {
+			// Creation failed, but left behind. Delete it
+			r.conn.DeletePolicy(ctx, &authorizer.DeletePolicyRequest{
+				Id: &common.PolicyIdentifier{
+					Name:         data.Name.ValueString(),
+					Organization: r.org,
+				},
+			})
+			resp.Diagnostics.AddError("XXXX Client Error",
+				fmt.Sprintf("Unable to create policy, got error: %s: %v", err, bindings))
+		}
+		resp.Diagnostics.AddError("Client Error",
+			fmt.Sprintf("Unable to create policy, got error: %s: %v", err, bindings))
+		return
+	}
+
+	data.Id = types.StringValue(data.Name.ValueString())
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

@@ -1,23 +1,28 @@
-resource "unionai_policy" "project1_admins" {
-  name = "project-1-admins"
+resource "unionai_policy" "some_service" {
+  name = "some-service"
 
-  role {
-    id = unionai_role.example.id
-    resource {
-      project = unionai_project.nelson.name
-      domain  = "development"
-    }
+  // Whole organization
+  organization {
+    id      = "tryv2"
+    role_id = unionai_role.example.id
   }
 
-  role {
-    id = unionai_role.example.id
-    resource {
-      project = unionai_project.nelson.name
-      domain  = "staging"
-    }
+  // All projects in this domain
+  domain {
+    id      = "development"
+    role_id = unionai_role.example.id
+  }
+
+  #// A specific project + domain(s)
+  project {
+    id      = unionai_project.nelson.name
+    role_id = unionai_role.example.id
+    domains = [
+      "staging",
+    ]
   }
 }
 
-output "project1_admins" {
-  value = unionai_policy.project1_admins
+output "policy_some_service" {
+  value = unionai_policy.some_service
 }
