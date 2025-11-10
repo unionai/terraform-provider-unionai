@@ -366,6 +366,10 @@ func (r *PolicyResource) Delete(ctx context.Context, req resource.DeleteRequest,
 		},
 	})
 	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete policy, got error: %s", err))
 		return
 	}

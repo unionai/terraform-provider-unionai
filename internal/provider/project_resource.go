@@ -115,6 +115,10 @@ func (r *ProjectResource) Create(ctx context.Context, req resource.CreateRequest
 		},
 	})
 	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create project, got error: %s", err))
 		return
 	}

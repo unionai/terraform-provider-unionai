@@ -12,6 +12,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/unionai/cloud/gen/pb-go/identity"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -257,6 +259,10 @@ func (r *AppResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		ClientId:     data.Id.ValueString(),
 	})
 	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		resp.Diagnostics.AddError(
 			"Error Reading UnionAI Application",
 			fmt.Sprintf("Error reading UnionAI Application %s: %s", data.Id.ValueString(), err),
