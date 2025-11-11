@@ -142,16 +142,20 @@ func (r *ProjectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		Limit:         1,
 	}
 
-	_, err := r.conn.ListProjects(context.Background(), &admin.ProjectListRequest{Filters: project_id_filter.FieldSelector, Limit: uint32(project_id_filter.Limit)})
+	project, err := r.conn.ListProjects(context.Background(), &admin.ProjectListRequest{Filters: project_id_filter.FieldSelector, Limit: uint32(project_id_filter.Limit)})
 	if err != nil {
-		if status.Code(err) == codes.NotFound {
-			resp.State.RemoveResource(ctx)
-			return
-		}
-
 		resp.Diagnostics.AddError("Failed to fetch project", err.Error())
 		return
 	}
+
+	if len(project.Projects) == 0 {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
+	data.Id = types.StringValue(project.Projects[0].Id)
+	data.Name = types.StringValue(project.Projects[0].Name)
+	data.Description = types.StringValue(project.Projects[0].Description)
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -164,6 +168,16 @@ func (r *ProjectResource) Update(ctx context.Context, req resource.UpdateRequest
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	_, err := r.conn.UpdateProject(ctx, &admin.Project{
+		Id:          data.Id.ValueString(),
+		Name:        data.Name.ValueString(),
+		Description: data.Description.ValueString(),
+	})
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to update project", err.Error())
 		return
 	}
 

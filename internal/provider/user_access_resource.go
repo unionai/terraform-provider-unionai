@@ -77,7 +77,6 @@ func (r *UserAccessResource) Configure(ctx context.Context, req resource.Configu
 			"Unexpected Resource Configure Type",
 			fmt.Sprintf("Expected *providerContext, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
-
 		return
 	}
 
