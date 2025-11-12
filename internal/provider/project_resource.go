@@ -106,8 +106,24 @@ func (r *ProjectResource) Create(ctx context.Context, req resource.CreateRequest
 
 	data.Id = data.Name
 
+	project_id_filter := Filters{
+		FieldSelector: fmt.Sprintf("eq(project.identifier,%s)", data.Id.ValueString()),
+		Limit:         1,
+	}
+
+	project, err := r.conn.ListProjects(context.Background(), &admin.ProjectListRequest{Filters: project_id_filter.FieldSelector, Limit: uint32(project_id_filter.Limit)})
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to read project", err.Error())
+		return
+	}
+
+	if len(project.Projects) > 0 {
+		resp.Diagnostics.AddError("Project already exists", fmt.Sprintf("Project with identifier %s already exists", data.Id.ValueString()))
+		return
+	}
+
 	// Create the project
-	_, err := r.conn.RegisterProject(ctx, &admin.ProjectRegisterRequest{
+	_, err = r.conn.RegisterProject(ctx, &admin.ProjectRegisterRequest{
 		Project: &admin.Project{
 			Id:          data.Id.ValueString(),
 			Name:        data.Name.ValueString(),
