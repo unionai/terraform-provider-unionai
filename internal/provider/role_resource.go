@@ -16,6 +16,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/unionai/cloud/gen/pb-go/authorizer"
 	"github.com/unionai/cloud/gen/pb-go/common"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -198,6 +200,11 @@ func (r *RoleResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		},
 	})
 	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			resp.State.RemoveResource(ctx)
+			return
+		}
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read role, got error: %s", err))
 		return
 	}
 

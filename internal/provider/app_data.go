@@ -8,6 +8,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/unionai/cloud/gen/pb-go/identity"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -148,6 +150,10 @@ func (d *AppDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 		ClientId:     data.Id.ValueString(),
 	})
 	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			resp.Diagnostics.AddError("Application not found", fmt.Sprintf("Application with ID %s not found", data.Id.ValueString()))
+			return
+		}
 		resp.Diagnostics.AddError(
 			"Error Reading UnionAI Application",
 			fmt.Sprintf("Error reading UnionAI Application %s: %s", data.Id.ValueString(), err),

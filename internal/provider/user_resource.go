@@ -215,5 +215,36 @@ func (r *UserResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 }
 
 func (r *UserResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	users, err := r.conn.ListUsers(ctx, &identity.ListUsersRequest{
+		Organization: r.org,
+		Request: &common.ListRequest{
+			Filters: []*common.Filter{
+				{
+					Field:    "email",
+					Function: common.Filter_EQUAL,
+					Values:   []string{req.ID},
+				},
+			},
+		},
+		IncludeSupportStaff: true,
+	})
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to fetch user", err.Error())
+		return
+	}
+	if len(users.Users) == 0 {
+		resp.Diagnostics.AddError("User not found", fmt.Sprintf("User %s not found", req.ID))
+		return
+	}
+
+	user := users.Users[0]
+
+	resp.State.Set(ctx, &UserResourceModel{
+		Id:        types.StringValue(user.Id.Subject),
+		FirstName: types.StringValue(user.Spec.FirstName),
+		LastName:  types.StringValue(user.Spec.LastName),
+		Email:     types.StringValue(user.Spec.Email),
+	})
+
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }

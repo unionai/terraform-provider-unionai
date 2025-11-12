@@ -11,6 +11,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/unionai/cloud/gen/pb-go/authorizer"
 	"github.com/unionai/cloud/gen/pb-go/common"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -95,6 +97,10 @@ func (d *RoleDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 
 	role, err := d.conn.GetRole(context.Background(), &authorizer.GetRoleRequest{Id: &common.RoleIdentifier{Name: data.Id.ValueString(), Organization: d.org}})
 	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			resp.Diagnostics.AddError("Role not found", fmt.Sprintf("Role with ID %s not found", data.Id.ValueString()))
+			return
+		}
 		resp.Diagnostics.AddError("Failed to fetch role", err.Error())
 		return
 	}

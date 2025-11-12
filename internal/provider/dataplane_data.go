@@ -10,6 +10,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/unionai/cloud/gen/pb-go/cluster"
 	"github.com/unionai/cloud/gen/pb-go/common"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -104,7 +106,11 @@ func (d *DataplaneDataSource) Read(ctx context.Context, req datasource.ReadReque
 		},
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to fetch cluster", err.Error())
+		if status.Code(err) == codes.NotFound {
+			resp.Diagnostics.AddError("Dataplane not found", fmt.Sprintf("Dataplane with ID %s not found", data.Id.ValueString()))
+			return
+		}
+		resp.Diagnostics.AddError("Failed to fetch dataplane", err.Error())
 		return
 	}
 	tflog.Trace(ctx, "GetCluster response", map[string]interface{}{"cluster": c})

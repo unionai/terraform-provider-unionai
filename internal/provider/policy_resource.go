@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -77,19 +79,22 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 			"id": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "Policy identifier",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"name": schema.StringAttribute{
 				MarkdownDescription: "Policy name",
 				Required:            true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"description": schema.StringAttribute{
 				MarkdownDescription: "Policy description",
 				Optional:            true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 		},
@@ -307,8 +312,9 @@ func (r *PolicyResource) Create(ctx context.Context, req resource.CreateRequest,
 					Organization: r.org,
 				},
 			})
-			resp.Diagnostics.AddError("XXXX Client Error",
+			resp.Diagnostics.AddError("Client Error",
 				fmt.Sprintf("Unable to create policy, got error: %s: %v", err, bindings))
+			return
 		}
 		resp.Diagnostics.AddError("Client Error",
 			fmt.Sprintf("Unable to create policy, got error: %s: %v", err, bindings))
@@ -326,10 +332,105 @@ func (r *PolicyResource) Read(ctx context.Context, req resource.ReadRequest, res
 
 	// Read Terraform prior state data into the model
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	// Use id if known, otherwise fallback to name
+	if data.Id.IsUnknown() || data.Id.ValueString() == "" {
+		data.Id = types.StringValue(data.Name.ValueString())
+	}
+
+	// Get the policy from the backend
+	policy, err := r.conn.GetPolicy(ctx, &authorizer.GetPolicyRequest{
+		Id: &common.PolicyIdentifier{
+			Name:         data.Id.ValueString(),
+			Organization: r.org,
+		},
+	})
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			resp.State.RemoveResource(ctx)
+			return
+		}
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read policy, got error: %s", err))
+		return
+	}
+
+	// Map top-level attributes
+	data.Id = types.StringValue(policy.Policy.Id.Name)
+	data.Name = types.StringValue(policy.Policy.Id.Name)
+	if policy.Policy.Description == "" {
+		data.Description = types.StringNull()
+	} else {
+		data.Description = types.StringValue(policy.Policy.Description)
+	}
+
+	// Reconstruct nested blocks from bindings
+	orgs := make([]PolicyRoleResourceOrg, 0)
+	domains := make([]PolicyRoleResourceDomain, 0)
+	projDomains := make(map[string][]string) // key: roleId|projectId -> []domain
+
+	for _, b := range policy.Policy.Bindings {
+		roleId := b.RoleId.GetName()
+		switch res := b.Resource.Resource.(type) {
+		case *common.Resource_Organization:
+			orgs = append(orgs, PolicyRoleResourceOrg{
+				Id:     types.StringValue(res.Organization.GetName()),
+				RoleId: types.StringValue(roleId),
+			})
+		case *common.Resource_Domain:
+			domains = append(domains, PolicyRoleResourceDomain{
+				Id:     types.StringValue(res.Domain.GetName()),
+				RoleId: types.StringValue(roleId),
+			})
+		case *common.Resource_Project:
+			projectId := res.Project.GetName()
+			domainName := ""
+			if res.Project.GetDomain() != nil {
+				domainName = res.Project.GetDomain().GetName()
+			}
+			key := roleId + "|" + projectId
+			if domainName != "" {
+				projDomains[key] = append(projDomains[key], domainName)
+			} else if _, ok := projDomains[key]; !ok {
+				// track project even if no domain present
+				projDomains[key] = []string{}
+			}
+		}
+	}
+
+	projects := make([]PolicyRoleResourceProject, 0, len(projDomains))
+	for key, doms := range projDomains {
+		idx := strings.Index(key, "|")
+		if idx <= 0 || idx >= len(key)-1 {
+			continue
+		}
+		roleId := key[:idx]
+		projectId := key[idx+1:]
+
+		// de-duplicate domains
+		uniq := make(map[string]struct{}, len(doms))
+		elements := make([]attr.Value, 0, len(doms))
+		for _, d := range doms {
+			if _, exists := uniq[d]; exists {
+				continue
+			}
+			uniq[d] = struct{}{}
+			elements = append(elements, types.StringValue(d))
+		}
+		domainSet := types.SetValueMust(types.StringType, elements)
+
+		projects = append(projects, PolicyRoleResourceProject{
+			Id:      types.StringValue(projectId),
+			Domains: domainSet,
+			RoleId:  types.StringValue(roleId),
+		})
+	}
+
+	data.Organization = orgs
+	data.Domain = domains
+	data.Project = projects
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -366,6 +467,10 @@ func (r *PolicyResource) Delete(ctx context.Context, req resource.DeleteRequest,
 		},
 	})
 	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete policy, got error: %s", err))
 		return
 	}

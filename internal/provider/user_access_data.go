@@ -10,6 +10,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/unionai/cloud/gen/pb-go/common"
 	"github.com/unionai/cloud/gen/pb-go/identity"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -97,6 +99,10 @@ func (d *UserAccessDataSource) Read(ctx context.Context, req datasource.ReadRequ
 		},
 	})
 	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			resp.Diagnostics.AddError("User not found", fmt.Sprintf("User with ID %s not found", data.UserId.ValueString()))
+			return
+		}
 		resp.Diagnostics.AddError("Failed to fetch user", err.Error())
 		return
 	}

@@ -9,6 +9,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/unionai/cloud/gen/pb-go/authorizer"
 	"github.com/unionai/cloud/gen/pb-go/common"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -139,6 +141,10 @@ func (d *PolicyDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 		},
 	})
 	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			resp.Diagnostics.AddError("Policy not found", fmt.Sprintf("Policy with ID %s not found", data.Id.ValueString()))
+			return
+		}
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read policy, got error: %s", err))
 		return
 	}
