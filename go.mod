@@ -2,7 +2,7 @@ module github.com/unionai/terraform-provider-enterprise
 
 go 1.24.6
 
-replace github.com/unionai/cloud => ../cloud
+replace github.com/unionai/cloud/gen/pb-go => ./proto
 
 require (
 	github.com/coreos/go-oidc/v3 v3.15.0
@@ -11,7 +11,7 @@ require (
 	github.com/hashicorp/terraform-plugin-go v0.29.0
 	github.com/hashicorp/terraform-plugin-log v0.9.0
 	github.com/hashicorp/terraform-plugin-testing v1.13.3
-	github.com/unionai/cloud v0.0.0-00010101000000-000000000000
+	github.com/unionai/cloud/gen/pb-go v0.0.0-00010101000000-000000000000
 	golang.org/x/oauth2 v0.30.0
 	google.golang.org/grpc v1.75.1
 )
