@@ -1,29 +1,48 @@
 # Union Terraform Provider
 
-## Provider
+The Union.ai Terraform provider allows you to manage Union.ai resources using Infrastructure as Code.
 
-Configure the provider by setting the following parameters:
+## Requirements
 
-    provider "unionai" {
-      allowed_orgs = [
-        "<your-allowed-org>",
-        "...",
-      ]
-      api_key = "<your-api-key-goes-here>"
+- [Terraform](https://www.terraform.io/downloads.html) >= 1.0
+- [Go](https://golang.org/doc/install) >= 1.24 (for development)
+
+## Using the Provider
+
+```terraform
+terraform {
+  required_providers {
+    unionai = {
+      source  = "unionai/enterprise"
+      version = "~> 1.0"
     }
+  }
+}
 
-You can also use the environment variable `UNIONAI_API_KEY` to provide the value
-above.
+provider "unionai" {
+  # API key for authentication - can also be set via UNIONAI_API_KEY environment variable
+  api_key = var.unionai_api_key
 
-## Credentials
+  # Optional: Restrict operations to specific organizations
+  allowed_orgs = ["your-org-name"]
+}
+```
 
-As Terraform runs unattended and will not have access to the browser, you need a
-non-Web credential to provide to the provider.
+## Authentication
 
-You can use `union` to accomplish that. Ensure you have these settings when
-creating your application:
+The provider requires authentication via API key. You can obtain an API key using the Union CLI:
 
-    union create api-key admin --name "<your-api-key-name>"
+```bash
+union create api-key admin --name "terraform-api-key"
+```
+
+The API key can be provided in two ways:
+1. Set the `api_key` attribute in the provider configuration
+2. Set the `UNIONAI_API_KEY` environment variable
+
+## Documentation
+
+Full documentation is available on the [Terraform Registry](https://registry.terraform.io/providers/unionai/enterprise/latest/docs).
 
 ## Allowed Organizations
 
@@ -31,26 +50,54 @@ To avoid unintended side effects by mixing credentials, you can specify the
 organizations in the provider configuration. The provider will only allow
 operations on resources in the allowed organizations.
 
+## Available Resources
+
+- `unionai_project` - Manage Union.ai projects
+- `unionai_user` - Manage users
+- `unionai_role` - Manage roles and permissions
+- `unionai_policy` - Manage access policies
+- `unionai_api_key` - Manage API keys
+- `unionai_application` - Manage OAuth applications
+- `unionai_user_access` - Assign policies to users
+- `unionai_app_access` - Assign policies to applications
+
+## Available Data Sources
+
+- `unionai_project` - Read project information
+- `unionai_user` - Read user information
+- `unionai_role` - Read role information
+- `unionai_policy` - Read policy information
+- `unionai_api_key` - Read API key information
+- `unionai_application` - Read application information
+- `unionai_dataplane` - Read dataplane information
+- `unionai_dataplanes` - List all dataplanes
+- `unionai_controlplane` - Read controlplane information
+
 ## Developer Setup
+
+### Prerequisites
 
 0.  Have a shared folder for repos
 
-        $ mkdir src
+        mkdir src
+        cd src
 
 1.  Clone this repository
 
-        $ git clone git@github.com:unionai/unionai-terraform-provider
+        git clone git@github.com:unionai/terraform-provider-enterprise.git
+        cd terraform-provider-enterprise
 
-2.  Clone the `cloud` repo as a sibling directory
+2.  Clone the `cloud` repo as a sibling directory (required for local development)
 
-        $ git clone git@github.com:unionai/cloud
+        cd ../
+        git clone git@github.com:unionai/cloud.git
 
-## Building
+### Building
 
-    $ cd unionai-terraform-provider
-    $ go build
+    cd terraform-provider-enterprise
+    go build
 
-## Test the provider
+## Testing the Provider Locally
 
 When testing changes on the terraform provider you want to point to a local
 version of the provider instead of getting it from the offical terraform
@@ -73,4 +120,20 @@ registry
       export TF_CLI_CONFIG_FILE="<path-to-the-terraformrc>"/.terraformrc
 
 - By unsetting this env var you can switch to getting it from the official
-  registry again ;)
+  registry again
+
+## Publishing to Terraform Registry
+
+See [PUBLISHING.md](./PUBLISHING.md) for detailed instructions on publishing this provider to the Terraform Registry.
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Run tests: `go test ./...`
+5. Submit a pull request
+
+## License
+
+This project is licensed under the Mozilla Public License Version 2.0 - see the [LICENSE](LICENSE) file for details.
