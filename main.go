@@ -28,7 +28,7 @@ func main() {
 	flag.Parse()
 
 	opts := providerserver.ServeOpts{
-		Address: "registry.terraform.io/unionai/enterprise",
+		Address: "registry.terraform.io/unionai/unionai",
 		Debug:   debug,
 	}
 

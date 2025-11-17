@@ -13,7 +13,7 @@ The Union.ai Terraform provider allows you to manage Union.ai resources using In
 terraform {
   required_providers {
     unionai = {
-      source  = "unionai/enterprise"
+      source  = "unionai/unionai"
       version = "~> 1.0"
     }
   }
@@ -42,7 +42,7 @@ The API key can be provided in two ways:
 
 ## Documentation
 
-Full documentation is available on the [Terraform Registry](https://registry.terraform.io/providers/unionai/enterprise/latest/docs).
+Full documentation is available on the [Terraform Registry](https://registry.terraform.io/providers/unionai/unionai/latest/docs).
 
 ## Allowed Organizations
 
@@ -110,7 +110,7 @@ registry
 
       provider_installation {
         dev_overrides {
-          "unionai/enterprise" = "<path-to-the-binary-built>"
+          "unionai/unionai" = "<path-to-the-binary-built>"
         }
         direct {}
       }

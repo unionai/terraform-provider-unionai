@@ -1,7 +1,7 @@
 terraform {
   required_providers {
     unionai = {
-      source  = "unionai/enterprise"
+      source  = "unionai/unionai"
       version = "0.1.0"
     }
   }

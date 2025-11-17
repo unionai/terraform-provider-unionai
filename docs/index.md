@@ -14,7 +14,7 @@ The Union.ai provider is used to interact with Union.ai resources. The provider 
 terraform {
   required_providers {
     unionai = {
-      source = "unionai/enterprise"
+      source = "unionai/unionai"
     }
   }
 }
