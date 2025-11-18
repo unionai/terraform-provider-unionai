@@ -27,7 +27,11 @@ fi
 
 # Validate existing documentation
 echo "Validating documentation..."
-if tfplugindocs validate; then
+# Use the parent directory as the provider directory
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROVIDER_DIR="$( cd "$SCRIPT_DIR/.." && pwd )"
+
+if tfplugindocs validate --provider-name unionai --provider-dir "$PROVIDER_DIR"; then
     echo -e "${GREEN}✓ Documentation validation passed!${NC}"
 else
     echo -e "${RED}✗ Documentation validation failed!${NC}"
@@ -45,5 +49,6 @@ echo -e "${GREEN}Documentation is ready for publishing!${NC}"
 echo ""
 echo "Documentation location: ./docs/"
 echo "  - Provider: docs/index.md"
+echo "  - Guides: docs/guides/"
 echo "  - Resources: docs/resources/"
 echo "  - Data Sources: docs/data-sources/"

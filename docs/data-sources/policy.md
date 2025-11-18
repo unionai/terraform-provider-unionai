@@ -29,8 +29,22 @@ output "policy_name" {
 
 ### Read-Only
 
-- `name` (String) The name of the policy.
 - `description` (String) The description of the policy.
-- `organization` (List of Object) Organization-level policy assignments.
-- `project` (List of Object) Project-level policy assignments.
-- `domain` (List of Object) Domain-level policy assignments.
+- `roles` (List of Object) The roles assigned by this policy (see [below for nested schema](#nestedatt--roles))
+
+<a id="nestedatt--roles"></a>
+### Nested Schema for `roles`
+
+Read-Only:
+
+- `role_id` (String) The ID of the role.
+- `resource` (Object) The resource to which the role applies (see [below for nested schema](#nestedobjatt--roles--resource))
+
+<a id="nestedobjatt--roles--resource"></a>
+### Nested Schema for `roles.resource`
+
+Read-Only:
+
+- `org_id` (String) The organization identifier (if this is an organization-level assignment).
+- `domain_id` (String) The domain identifier (if this is a domain-level assignment).
+- `project_id` (String) The project identifier (if this is a project-level assignment).

@@ -63,3 +63,11 @@ The `allowed_orgs` setting provides an additional safety mechanism when working 
 - Add an extra layer of protection in CI/CD pipelines
 
 If the API key's organization is not in the `allowed_orgs` list, the provider will refuse to operate and return an error.
+
+## Useful Links
+
+- [Union.ai Documentation](https://docs.union.ai/)
+- [Union.ai API Reference](https://docs.union.ai/api/)
+- [Union CLI Documentation](https://docs.union.ai/cli/)
+- [GitHub Repository](https://github.com/unionai/terraform-provider-enterprise)
+- [Report Issues](https://github.com/unionai/terraform-provider-enterprise/issues)

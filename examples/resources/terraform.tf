@@ -7,8 +7,4 @@ terraform {
   }
 }
 
-provider "unionai" {
-  allowed_orgs = [
-    "tryv2",
-  ]
-}
+provider "unionai" {}

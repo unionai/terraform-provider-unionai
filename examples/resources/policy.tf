@@ -22,7 +22,7 @@ resource "unionai_policy" "some_service" {
     id      = unionai_project.test.id
     role_id = unionai_role.example.id
     domains = [
-      "staging",
+      "development",
     ]
   }
 }
