@@ -1,4 +1,4 @@
-module github.com/unionai/terraform-provider-enterprise
+module github.com/unionai/terraform-provider-unionai
 
 go 1.24.6
 

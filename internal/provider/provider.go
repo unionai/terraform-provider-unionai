@@ -133,6 +133,7 @@ func (p *UnionaiProvider) Resources(ctx context.Context) []func() resource.Resou
 		NewApiKeyResource,
 		NewAppResource,
 		NewAppAccessResource,
+		NewTaskEnvironmentResource,
 	}
 }
 

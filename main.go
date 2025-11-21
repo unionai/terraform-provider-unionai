@@ -9,7 +9,7 @@ import (
 	"log"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
-	"github.com/unionai/terraform-provider-enterprise/internal/provider"
+	"github.com/unionai/terraform-provider-unionai/internal/provider"
 )
 
 var (
