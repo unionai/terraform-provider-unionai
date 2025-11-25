@@ -113,9 +113,9 @@ Type `yes` when prompted to confirm.
 
 Now that you've created your first resource, you can:
 
+- Review the available resources in the provider
 - Explore the [Managing Projects and Users](./managing-projects-users.md) guide
 - Learn about [Access Control with Policies](./access-control-policies.md)
-- Review the [available resources](/docs/resources) in the provider
 
 ## Cleaning Up
 
