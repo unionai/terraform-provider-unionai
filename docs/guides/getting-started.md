@@ -117,6 +117,11 @@ Now that you've created your first resource, you can:
 - Explore the [Managing Projects and Users](./managing-projects-users.md) guide
 - Learn about [Access Control with Policies](./access-control-policies.md)
 
+### Synchronizing your Identity Provider
+
+- Sync [Union policies with Google Workspace](./sync-policy-with-goog-ad.md)
+- Sync [Union policies with Microsoft Entra ID](./sync-policy-with-msft-entra.md)
+
 ## Cleaning Up
 
 To destroy the resources you created:

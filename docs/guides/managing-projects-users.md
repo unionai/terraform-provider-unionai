@@ -11,16 +11,17 @@ This guide demonstrates how to manage projects and users in Union.ai using Terra
 
 In this guide, you'll learn how to:
 
-- Create multiple projects
+- Create multiple projects (each with built-in development, staging, and production domains)
 - Create user accounts
-- Assign users to projects with appropriate roles
+- Use built-in or custom roles
+- Assign users to projects with appropriate roles and domains
 - Manage user access programmatically
 
 ## Example: Setting Up a Multi-Project Environment
 
 ### 1. Define Your Projects
 
-Create multiple projects for different teams or purposes:
+Create multiple projects for different teams or purposes. Each project automatically includes three built-in domains: `development`, `staging`, and `production`.
 
 ```terraform
 resource "unionai_project" "ml_training" {
@@ -31,11 +32,6 @@ resource "unionai_project" "ml_training" {
 resource "unionai_project" "data_processing" {
   name        = "data-processing"
   description = "Data pipeline and ETL workflows"
-}
-
-resource "unionai_project" "production" {
-  name        = "production"
-  description = "Production workflows"
 }
 ```
 
@@ -66,45 +62,75 @@ resource "unionai_user" "admin" {
 }
 ```
 
-### 3. Define Roles
+### 3. Reference Built-in Roles
 
-Create custom roles with specific permissions:
+Union.ai provides three built-in roles. Load them using data sources:
 
 ```terraform
-resource "unionai_role" "project_admin" {
-  name        = "project-admin"
-  description = "Full access to project resources"
+data "unionai_role" "admin" {
+  name = "admin"
 }
 
-resource "unionai_role" "developer" {
-  name        = "developer"
-  description = "Read and execute workflows"
+data "unionai_role" "contributor" {
+  name = "contributor"
 }
 
-resource "unionai_role" "viewer" {
-  name        = "viewer"
-  description = "Read-only access"
+data "unionai_role" "viewer" {
+  name = "viewer"
+}
+```
+
+Alternatively, you can create custom roles with specific permissions:
+
+```terraform
+resource "unionai_role" "ml_developer" {
+  name        = "ml-developer"
+  description = "ML-specific development permissions"
+  actions = [
+    "view_flyte_executions",
+    "create_flyte_executions",
+    "view_flyte_inventory",
+    "write_flyte_inventory",
+  ]
 }
 ```
 
 ### 4. Create Policies
 
-Define access policies that combine roles with permissions:
+Define access policies that bind roles to specific projects and domains:
 
 ```terraform
+# Admin access to ML training across all domains
 resource "unionai_policy" "ml_training_admin" {
-  project_id = unionai_project.ml_training.id
-  role_id    = unionai_role.project_admin.id
+  name = "ml-training-admin"
+
+  project {
+    id      = unionai_project.ml_training.id
+    role_id = data.unionai_role.admin.id
+    domains = ["development", "staging", "production"]
+  }
 }
 
-resource "unionai_policy" "data_processing_developer" {
-  project_id = unionai_project.data_processing.id
-  role_id    = unionai_role.developer.id
+# Contributor access to data processing dev and staging
+resource "unionai_policy" "data_processing_contributor" {
+  name = "data-processing-contributor"
+
+  project {
+    id      = unionai_project.data_processing.id
+    role_id = data.unionai_role.contributor.id
+    domains = ["development", "staging"]
+  }
 }
 
-resource "unionai_policy" "production_viewer" {
-  project_id = unionai_project.production.id
-  role_id    = unionai_role.viewer.id
+# Viewer access to data processing production
+resource "unionai_policy" "data_processing_viewer" {
+  name = "data-processing-viewer"
+
+  project {
+    id      = unionai_project.data_processing.id
+    role_id = data.unionai_role.viewer.id
+    domains = ["production"]
+  }
 }
 ```
 
@@ -113,38 +139,33 @@ resource "unionai_policy" "production_viewer" {
 Grant users access to projects using the policies:
 
 ```terraform
-# Admin has full access to all projects
+# Admin has full access to ML training
 resource "unionai_user_access" "admin_ml_training" {
-  user_id   = unionai_user.admin.id
-  policy_id = unionai_policy.ml_training_admin.id
+  user   = unionai_user.admin.id
+  policy = unionai_policy.ml_training_admin.id
 }
 
-resource "unionai_user_access" "admin_data_processing" {
-  user_id   = unionai_user.admin.id
-  policy_id = unionai_policy.ml_training_admin.id
-}
-
-# Data scientist has developer access to ML training
+# Data scientist has admin access to ML training
 resource "unionai_user_access" "ds_ml_training" {
-  user_id   = unionai_user.data_scientist.id
-  policy_id = unionai_policy.ml_training_admin.id
+  user   = unionai_user.data_scientist.id
+  policy = unionai_policy.ml_training_admin.id
 }
 
-# ML engineer has developer access to data processing
+# ML engineer has contributor access to data processing (dev/staging)
 resource "unionai_user_access" "mle_data_processing" {
-  user_id   = unionai_user.ml_engineer.id
-  policy_id = unionai_policy.data_processing_developer.id
+  user   = unionai_user.ml_engineer.id
+  policy = unionai_policy.data_processing_contributor.id
 }
 
-# Both can view production
-resource "unionai_user_access" "ds_production" {
-  user_id   = unionai_user.data_scientist.id
-  policy_id = unionai_policy.production_viewer.id
+# Both data scientist and ML engineer can view data processing production
+resource "unionai_user_access" "ds_data_processing_viewer" {
+  user   = unionai_user.data_scientist.id
+  policy = unionai_policy.data_processing_viewer.id
 }
 
-resource "unionai_user_access" "mle_production" {
-  user_id   = unionai_user.ml_engineer.id
-  policy_id = unionai_policy.production_viewer.id
+resource "unionai_user_access" "mle_data_processing_viewer" {
+  user   = unionai_user.ml_engineer.id
+  policy = unionai_policy.data_processing_viewer.id
 }
 ```
 
@@ -165,18 +186,20 @@ data "unionai_user" "existing_user" {
 
 # Grant access to existing resources
 resource "unionai_user_access" "existing_access" {
-  user_id   = data.unionai_user.existing_user.id
-  policy_id = unionai_policy.production_viewer.id
+  user   = data.unionai_user.existing_user.id
+  policy = unionai_policy.data_processing_viewer.id
 }
 ```
 
 ## Best Practices
 
-1. **Use Variables**: Define user emails and project names as variables for easier management
-2. **Organize by Environment**: Use Terraform workspaces or separate directories for dev/staging/prod
-3. **Version Control**: Keep your Terraform configuration in Git
-4. **State Management**: Use remote state (S3, Terraform Cloud) for team collaboration
-5. **Security**: Never commit API keys or sensitive data - use variables and `.tfvars` files
+1. **Use Built-in Roles First**: Start with the built-in roles (admin, contributor, viewer) before creating custom roles
+2. **Leverage Built-in Domains**: Use the three built-in domains (development, staging, production) within each project rather than creating separate projects for each environment
+3. **Use Variables**: Define user emails and project names as variables for easier management
+4. **Domain-Based Access Control**: Use stricter policies in production domains than in development or staging
+5. **Version Control**: Keep your Terraform configuration in Git
+6. **State Management**: Use remote state (S3, Terraform Cloud) for team collaboration
+7. **Security**: Never commit API keys or sensitive data to version control
 
 ## Complete Example
 
