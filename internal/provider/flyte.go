@@ -8,7 +8,6 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
@@ -32,6 +31,106 @@ func (f *FlyteEnvironment) removeAnsiCodes(data []byte) []byte {
 	return re.ReplaceAll(data, []byte{})
 }
 
+// Parses the table from the input, matching the fields in the header, and return all the rows of the table
+//
+// Example:
+//
+// ┌─────────────────────────────────────────────────────────────────────────────┬────────────────────────────────────────┐
+// │ Environment                                                                 │ Image                                  │
+// ╞═════════════════════════════════════════════════════════════════════════════╪════════════════════════════════════════╡
+// │ hello_world                                                                 │ auto                                   │
+// └─────────────────────────────────────────────────────────────────────────────┴────────────────────────────────────────┘
+//                                                         Entities
+// ┌───────────┬───────────────────────────────┬─────────────────────────────────────────────────────────┬────────────────┐
+// │ Type      │ Name                          │ Version                                                 │ Triggers       │
+// ╞═══════════╪═══════════════════════════════╪═════════════════════════════════════════════════════════╪════════════════╡
+// │ task      │ hello_world.fn3               │ d8b4e239eadafac9c83900ae8aab7841                        │                │
+// │ task      │ hello_world.fn                │ d8b4e239eadafac9c83900ae8aab7841                        │                │
+// │ task      │ hello_world.main              │ d8b4e239eadafac9c83900ae8aab7841                        │                │
+// └───────────┴───────────────────────────────┴─────────────────────────────────────────────────────────┴────────────────┘
+
+func (f *FlyteEnvironment) fetchTable(fields []string, input []byte) [][]string {
+	lines := strings.Split(string(input), "\n")
+	var results [][]string
+
+	// Find the header row that contains all the specified fields
+	headerIndex := -1
+	var columnIndices []int
+
+	for i, line := range lines {
+		if !strings.Contains(line, "│") {
+			continue
+		}
+
+		// Check if this line contains all the fields we're looking for
+		containsAllFields := true
+		for _, field := range fields {
+			if !strings.Contains(line, field) {
+				containsAllFields = false
+				break
+			}
+		}
+
+		if containsAllFields {
+			headerIndex = i
+			// Parse column positions for each field
+			parts := strings.Split(line, "│")
+			columnIndices = make([]int, len(fields))
+
+			// Map each field to its column index
+			for j, field := range fields {
+				for k, part := range parts {
+					if strings.TrimSpace(part) == field {
+						columnIndices[j] = k
+						break
+					}
+				}
+			}
+			break
+		}
+	}
+
+	if headerIndex == -1 {
+		return results // No matching header found
+	}
+
+	// Parse data rows after the header
+	// Skip the separator line (next line after header)
+	inDataSection := false
+	for i := headerIndex + 1; i < len(lines); i++ {
+		line := lines[i]
+
+		// Skip the separator line (╞═══╡ or ├───┤)
+		if strings.Contains(line, "═") || strings.Contains(line, "╞") {
+			inDataSection = true
+			continue
+		}
+
+		// Stop at the bottom border of the table
+		if strings.Contains(line, "└") || strings.Contains(line, "───────────────") {
+			break
+		}
+
+		// Parse data rows
+		if inDataSection && strings.Contains(line, "│") {
+			parts := strings.Split(line, "│")
+			if len(parts) > 1 {
+				var row []string
+				for _, colIdx := range columnIndices {
+					if colIdx < len(parts) {
+						row = append(row, strings.TrimSpace(parts[colIdx]))
+					} else {
+						row = append(row, "")
+					}
+				}
+				results = append(results, row)
+			}
+		}
+	}
+
+	return results
+}
+
 func (f *FlyteEnvironment) retrieveNameAndVersion(
 	ctx context.Context,
 	path string, project string, domain string, id string,
@@ -49,30 +148,6 @@ func (f *FlyteEnvironment) retrieveNameAndVersion(
 		f.lock.Unlock()
 	}
 
-	// Call: flyte deploy --project <project> --domain <domain> <path> <id>
-	// Example: flyte deploy --project nelson --domain development hello.py env
-	// Output: d9f9ec4309463d534e147a4ef1222340
-
-	// Shell command: flyte deploy --project <project> --domain <domain> <path> <id>
-	// Example: flyte deploy --project nelson --domain development hello.py env
-
-	// Deploying root - environment: env
-	// ⠏ Deploying...13:26:17.239626 WARNING  _deploy.py:261 -  Built Image for environment hello_world, image: ghcr.io/flyteorg/flyte:py3.12-v2.0.0b32
-	//                                                       Environments
-	// ┌─────────────────────────────────────────────────────────────────────────────┬────────────────────────────────────────┐
-	// │ Environment                                                                 │ Image                                  │
-	// ╞═════════════════════════════════════════════════════════════════════════════╪════════════════════════════════════════╡
-	// │ hello_world                                                                 │ auto                                   │
-	// └─────────────────────────────────────────────────────────────────────────────┴────────────────────────────────────────┘
-	//                                                         Entities
-	// ┌───────────┬───────────────────────────────┬─────────────────────────────────────────────────────────┬────────────────┐
-	// │ Type      │ Name                          │ Version                                                 │ Triggers       │
-	// ╞═══════════╪═══════════════════════════════╪═════════════════════════════════════════════════════════╪════════════════╡
-	// │ task      │ hello_world.fn3               │ d8b4e239eadafac9c83900ae8aab7841                        │                │
-	// │ task      │ hello_world.fn                │ d8b4e239eadafac9c83900ae8aab7841                        │                │
-	// │ task      │ hello_world.main              │ d8b4e239eadafac9c83900ae8aab7841                        │                │
-	// └───────────┴───────────────────────────────┴─────────────────────────────────────────────────────────┴────────────────┘
-
 	cmd := exec.Command("flyte", "deploy", "--dry-run",
 		"--project", project,
 		"--domain", domain,
@@ -88,53 +163,24 @@ func (f *FlyteEnvironment) retrieveNameAndVersion(
 	var version string
 	var tasks []string
 
-	lines := strings.Split(string(out), "\n")
-
-	// Parse output and retrieve the name of the environment
-	foundEnvironmentTable := false
-	for _, line := range lines {
-		if !foundEnvironmentTable {
-			if strings.Contains(line, "│") && strings.Contains(line, "Environment") && strings.Contains(line, "Image") {
-				foundEnvironmentTable = true
-			}
-			continue
-		}
-		if strings.Contains(line, "───────────────") {
-			break // We found the end of the version table
-		}
-
-		if strings.Contains(line, "│") {
-			parts := strings.Split(line, "│")
-			if len(parts) > 1 {
-				name = strings.TrimSpace(parts[1])
-				break
-			}
-		}
+	// Parse environment table to get the environment name
+	envTable := f.fetchTable([]string{"Environment", "Image"}, out)
+	if len(envTable) > 0 {
+		name = envTable[0][0]
 	}
 
-	// Parse output and retrieve the version. Use the first value of a "task" with the "<environment_name>." prefix.
-	foundVersionTable := false
-	for _, line := range lines {
-		// Wait for header "Type │ Name │ Version" before matching version
-		if !foundVersionTable {
-			if strings.Contains(line, "│") && strings.Contains(line, "Type") && strings.Contains(line, "Name") && strings.Contains(line, "Version") {
-				foundVersionTable = true
-			}
-			continue
-		}
-		if strings.Contains(line, "───────────────") {
-			break // We found the end of the version table
-		}
-
-		if strings.HasPrefix(line, "│ task ") {
-			// Split the line on "│" and trim spaces to handle table alignment
-			parts := strings.Split(line, "│")
-			if len(parts) > 2 {
-				taskName := strings.TrimSpace(parts[2])
-				if strings.HasPrefix(taskName, name+".") {
-					version = strings.TrimSpace(parts[3])
-					tasks = append(tasks, taskName)
+	// Parse entities table to get version and tasks
+	entitiesTable := f.fetchTable([]string{"Type", "Name", "Version"}, out)
+	for _, row := range entitiesTable {
+		if len(row) >= 3 && row[0] == "task" {
+			taskName := row[1]
+			taskVersion := row[2]
+			// Only include tasks that belong to this environment
+			if strings.HasPrefix(taskName, name+".") {
+				if version == "" {
+					version = taskVersion
 				}
+				tasks = append(tasks, taskName)
 			}
 		}
 	}
@@ -143,9 +189,10 @@ func (f *FlyteEnvironment) retrieveNameAndVersion(
 		return nil, fmt.Errorf("failed to parse name and version from flyte deploy output")
 	}
 
-	tflog.Trace(ctx, fmt.Sprintf("traced raw %d", time.Now().Unix()), map[string]interface{}{
+	tflog.Trace(ctx, "retrieveNameAndVersion", map[string]interface{}{
 		"name":    name,
 		"version": version,
+		"tasks":   tasks,
 		"output":  string(out),
 	})
 
@@ -156,7 +203,7 @@ func (f *FlyteEnvironment) retrieveNameAndVersion(
 	}, nil
 }
 
-func (f *FlyteEnvironment) uploadNewVersion(ctx context.Context, path string, project string, domain string, id string) error {
+func (f *FlyteEnvironment) uploadNewVersion(path string, project string, domain string, id string) error {
 	cmd := exec.Command("flyte", "deploy",
 		"--project", project,
 		"--domain", domain,

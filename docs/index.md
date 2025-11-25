@@ -67,7 +67,4 @@ If the API key's organization is not in the `allowed_orgs` list, the provider wi
 ## Useful Links
 
 - [Union.ai Documentation](https://docs.union.ai/)
-- [Union.ai API Reference](https://docs.union.ai/api/)
-- [Union CLI Documentation](https://docs.union.ai/cli/)
-- [GitHub Repository](https://github.com/unionai/terraform-provider-enterprise)
-- [Report Issues](https://github.com/unionai/terraform-provider-enterprise/issues)
+- [Report Issues](mailto:support+terraform@union.ai)

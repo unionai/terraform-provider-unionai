@@ -179,24 +179,6 @@ func (r *TaskEnvironmentResource) Create(ctx context.Context, req resource.Creat
 		return
 	}
 
-	// name, version, err := r.flyte.retrieveNameAndVersion(
-	// 	ctx,
-	// 	data.Path.ValueString(),
-	// 	data.Project.ValueString(),
-	// 	data.Domain.ValueString(), data.Id.ValueString(),
-	// )
-	// if err != nil {
-	// 	resp.Diagnostics.AddError(
-	// 		"Task environment version calculation failed",
-	// 		fmt.Sprintf("Failed to calculate version for %s: %s", data.Path.ValueString(), err),
-	// 	)
-	// 	return
-	// }
-	// tflog.Trace(ctx, "traced create", map[string]interface{}{
-	// 	"name":    name,
-	// 	"version": version,
-	// })
-
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -209,24 +191,6 @@ func (r *TaskEnvironmentResource) Read(ctx context.Context, req resource.ReadReq
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
-	// name, version, err := r.flyte.retrieveNameAndVersion(
-	// 	ctx,
-	// 	data.Path.ValueString(),
-	// 	data.Project.ValueString(),
-	// 	data.Domain.ValueString(), data.Id.ValueString(),
-	// )
-	// if err != nil {
-	// 	resp.Diagnostics.AddError(
-	// 		"Task environment version calculation failed",
-	// 		fmt.Sprintf("Failed to calculate version for %s: %s", data.Path.ValueString(), err),
-	// 	)
-	// 	return
-	// }
-	// tflog.Trace(ctx, "traced read", map[string]interface{}{
-	// 	"name":    name,
-	// 	"version": version,
-	// })
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -242,25 +206,7 @@ func (r *TaskEnvironmentResource) Update(ctx context.Context, req resource.Updat
 		return
 	}
 
-	// name, version, err := r.flyte.retrieveNameAndVersion(
-	// 	ctx,
-	// 	data.Path.ValueString(),
-	// 	data.Project.ValueString(),
-	// 	data.Domain.ValueString(), data.Id.ValueString(),
-	// )
-	// if err != nil {
-	// 	resp.Diagnostics.AddError(
-	// 		"Task environment version calculation failed",
-	// 		fmt.Sprintf("Failed to calculate version for %s: %s", data.Path.ValueString(), err),
-	// 	)
-	// 	return
-	// }
-	// tflog.Trace(ctx, "traced update", map[string]interface{}{
-	// 	"name":    name,
-	// 	"version": version,
-	// })
-
-	if err := r.flyte.uploadNewVersion(ctx, data.Path.ValueString(), data.Project.ValueString(), data.Domain.ValueString(), data.Id.ValueString()); err != nil {
+	if err := r.flyte.uploadNewVersion(data.Path.ValueString(), data.Project.ValueString(), data.Domain.ValueString(), data.Id.ValueString()); err != nil {
 		resp.Diagnostics.AddError(
 			"Task environment update failed",
 			fmt.Sprintf("Failed to upload new version for %s: %s", data.Path.ValueString(), err),

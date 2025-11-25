@@ -7,7 +7,6 @@
 # The environment is defined in this file. If this file changes, a new version gets
 # deployed by Terraform. If no changes, Terraform will do nothing.
 #
-# TEST
 
 import flyte
 
