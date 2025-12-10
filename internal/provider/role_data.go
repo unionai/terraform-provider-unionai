@@ -9,8 +9,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
-	"github.com/unionai/cloud/gen/pb-go/authorizer"
-	"github.com/unionai/cloud/gen/pb-go/common"
+	"github.com/unionai/terraform-provider-unionai/proto/authorizer"
+	"github.com/unionai/terraform-provider-unionai/proto/common"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

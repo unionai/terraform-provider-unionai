@@ -10,8 +10,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/unionai/cloud/gen/pb-go/authorizer"
-	"github.com/unionai/cloud/gen/pb-go/common"
+	"github.com/unionai/terraform-provider-unionai/proto/authorizer"
+	"github.com/unionai/terraform-provider-unionai/proto/common"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

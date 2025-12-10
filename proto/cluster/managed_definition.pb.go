@@ -9,7 +9,7 @@ package cluster
 import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	core "github.com/flyteorg/flyte/flyteidl/gen/pb-go/flyteidl/core"
-	common "github.com/unionai/cloud/gen/pb-go/common"
+	common "github.com/unionai/terraform-provider-unionai/proto/common"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"

@@ -8,7 +8,7 @@ import (
 	connect "connectrpc.com/connect"
 	context "context"
 	errors "errors"
-	identity "github.com/unionai/cloud/gen/pb-go/identity"
+	identity "github.com/unionai/terraform-provider-unionai/proto/identity"
 	http "net/http"
 	strings "strings"
 )

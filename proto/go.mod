@@ -1,4 +1,4 @@
-module github.com/unionai/cloud/gen/pb-go
+module github.com/unionai/terraform-provider-unionai/proto
 
 go 1.24.6
 

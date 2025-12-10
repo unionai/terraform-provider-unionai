@@ -8,7 +8,7 @@ import (
 	connect "connectrpc.com/connect"
 	context "context"
 	errors "errors"
-	authorizer "github.com/unionai/cloud/gen/pb-go/authorizer"
+	authorizer "github.com/unionai/terraform-provider-unionai/proto/authorizer"
 	http "net/http"
 	strings "strings"
 )

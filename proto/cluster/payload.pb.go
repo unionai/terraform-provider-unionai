@@ -7,7 +7,7 @@
 package cluster
 
 import (
-	common "github.com/unionai/cloud/gen/pb-go/common"
+	common "github.com/unionai/terraform-provider-unionai/proto/common"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"

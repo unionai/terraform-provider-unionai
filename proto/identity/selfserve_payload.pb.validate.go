@@ -18,7 +18,7 @@ import (
 
 	"google.golang.org/protobuf/types/known/anypb"
 
-	org "github.com/unionai/cloud/gen/pb-go/org"
+	org "github.com/unionai/terraform-provider-unionai/proto/org"
 )
 
 // ensure the imports are used

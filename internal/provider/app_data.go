@@ -7,7 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/unionai/cloud/gen/pb-go/identity"
+	"github.com/unionai/terraform-provider-unionai/proto/identity"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
