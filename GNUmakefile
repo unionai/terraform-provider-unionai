@@ -1,5 +1,8 @@
 default: fmt lint install generate
 
+local:
+	go build -o terraform-provider-unionai -v .
+
 build:
 	go build -v ./...
 

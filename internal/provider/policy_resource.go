@@ -306,7 +306,7 @@ func (r *PolicyResource) Create(ctx context.Context, req resource.CreateRequest,
 	}); err != nil {
 		if status.Code(err) == codes.Internal {
 			// Creation failed, but left behind. Delete it
-			r.conn.DeletePolicy(ctx, &authorizer.DeletePolicyRequest{
+			_, _ = r.conn.DeletePolicy(ctx, &authorizer.DeletePolicyRequest{
 				Id: &common.PolicyIdentifier{
 					Name:         data.Name.ValueString(),
 					Organization: r.org,
