@@ -84,7 +84,5 @@ output "registry_secrets" {
 
 ## Notes
 
-- The list is sorted by organization, domain, project, and name for deterministic output.
-- Empty strings for `domain` and `project` indicate organization-level or domain-level secrets respectively.
 - The actual secret values are not returned for security reasons.
 - The data source handles pagination automatically to retrieve all secrets.
