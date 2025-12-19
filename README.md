@@ -60,6 +60,7 @@ operations on resources in the allowed organizations.
 - `unionai_application` - Manage OAuth applications
 - `unionai_user_access` - Assign policies to users
 - `unionai_app_access` - Assign policies to applications
+- `unionai_secret` - Manage secrets (API keys, passwords, credentials)
 
 ## Available Data Sources
 
@@ -72,6 +73,8 @@ operations on resources in the allowed organizations.
 - `unionai_dataplane` - Read dataplane information
 - `unionai_dataplanes` - List all dataplanes
 - `unionai_controlplane` - Read controlplane information
+- `unionai_secret` - Read secret metadata
+- `unionai_secrets` - List all secrets with their identifiers
 
 ## Developer Setup
 

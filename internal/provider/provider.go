@@ -134,6 +134,7 @@ func (p *UnionaiProvider) Resources(ctx context.Context) []func() resource.Resou
 		NewAppResource,
 		NewAppAccessResource,
 		NewTaskEnvironmentResource,
+		NewSecretResource,
 	}
 }
 
@@ -150,6 +151,8 @@ func (p *UnionaiProvider) DataSources(ctx context.Context) []func() datasource.D
 		NewDataplaneDataSource,
 		NewDataplanesDataSource,
 		NewControlplaneDataSource,
+		NewSecretDataSource,
+		NewSecretsDataSource,
 	}
 }
 
