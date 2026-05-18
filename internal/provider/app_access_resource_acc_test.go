@@ -7,72 +7,108 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
-func TestAccAppAccessResource_Basic(t *testing.T) {
+func TestAccAppAccessResource_ProjectScoped(t *testing.T) {
 	keyName := "tf-acc-test-app-access"
+	projectName := "tf-acc-test-project"
+	roleName := "tf-acc-test-role"
+	policyName := "tf-acc-test-policy"
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
-			// Step 1: Create the API key and assign it to the policy
 			{
-				Config: testAccAppAccessConfig(keyName),
+				Config: testAccAppAccessProjectScopedConfig(keyName, projectName, roleName, policyName),
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr("unionai_application_access.test", "app", keyName),
-					resource.TestCheckResourceAttr("unionai_application_access.test", "policy", "contributor"),
+					resource.TestCheckResourceAttr("unionai_application_access.test", "policy", policyName),
 				),
 			},
-			// Step 2: Verify the assignment exists server-side via the data source
+			// Verify the assignment exists server-side via the data source
 			{
-				Config: testAccAppAccessConfigWithDataSource(keyName),
+				Config: testAccAppAccessProjectScopedConfigWithDataSource(keyName, projectName, roleName, policyName),
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr("data.unionai_application_access.verify", "app_id", keyName),
-					resource.TestCheckResourceAttr("data.unionai_application_access.verify", "policy_id", "contributor"),
+					resource.TestCheckResourceAttr("data.unionai_application_access.verify", "policy_id", policyName),
 				),
 			},
 		},
 	})
 }
 
-func testAccAppAccessConfig(keyName string) string {
+func testAccAppAccessProjectScopedConfig(keyName, projectName, roleName, policyName string) string {
 	return fmt.Sprintf(`
 provider "unionai" {}
+
+resource "unionai_project" "test" {
+  name        = %[2]q
+  description = "Acceptance test project"
+}
+
+resource "unionai_role" "test" {
+  name        = %[3]q
+  description = "Acceptance test role"
+  actions     = ["view_flyte_executions"]
+}
+
+resource "unionai_policy" "test" {
+  name = %[4]q
+
+  project {
+    id      = unionai_project.test.id
+    role_id = unionai_role.test.id
+    domains = ["development"]
+  }
+}
 
 resource "unionai_api_key" "test" {
   id = %[1]q
 }
 
-data "unionai_policy" "contributor" {
-  id = "contributor"
-}
-
 resource "unionai_application_access" "test" {
   app    = unionai_api_key.test.id
-  policy = data.unionai_policy.contributor.id
+  policy = unionai_policy.test.id
 }
-`, keyName)
+`, keyName, projectName, roleName, policyName)
 }
 
-func testAccAppAccessConfigWithDataSource(keyName string) string {
+func testAccAppAccessProjectScopedConfigWithDataSource(keyName, projectName, roleName, policyName string) string {
 	return fmt.Sprintf(`
 provider "unionai" {}
+
+resource "unionai_project" "test" {
+  name        = %[2]q
+  description = "Acceptance test project"
+}
+
+resource "unionai_role" "test" {
+  name        = %[3]q
+  description = "Acceptance test role"
+  actions     = ["view_flyte_executions"]
+}
+
+resource "unionai_policy" "test" {
+  name = %[4]q
+
+  project {
+    id      = unionai_project.test.id
+    role_id = unionai_role.test.id
+    domains = ["development"]
+  }
+}
 
 resource "unionai_api_key" "test" {
   id = %[1]q
 }
 
-data "unionai_policy" "contributor" {
-  id = "contributor"
-}
-
 resource "unionai_application_access" "test" {
   app    = unionai_api_key.test.id
-  policy = data.unionai_policy.contributor.id
+  policy = unionai_policy.test.id
 }
 
 data "unionai_application_access" "verify" {
   app_id    = unionai_api_key.test.id
-  policy_id = data.unionai_policy.contributor.id
+  policy_id = unionai_policy.test.id
 }
-`, keyName)
+`, keyName, projectName, roleName, policyName)
 }
