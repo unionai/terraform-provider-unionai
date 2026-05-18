@@ -42,6 +42,7 @@ func (r *AppAccessResource) Metadata(ctx context.Context, req resource.MetadataR
 
 func (r *AppAccessResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		// This description is used by the documentation generator and the language server.
 		MarkdownDescription: "Application access resource",
 
 		Attributes: map[string]schema.Attribute{
@@ -64,6 +65,7 @@ func (r *AppAccessResource) Schema(ctx context.Context, req resource.SchemaReque
 }
 
 func (r *AppAccessResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+	// Prevent panic if the provider has not been configured.
 	if req.ProviderData == nil {
 		return
 	}
@@ -92,6 +94,7 @@ func (r *AppAccessResource) Configure(ctx context.Context, req resource.Configur
 func (r *AppAccessResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var data AppAccessResourceModel
 
+	// Read Terraform plan data into the model
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 
 	if resp.Diagnostics.HasError() {
@@ -122,12 +125,14 @@ func (r *AppAccessResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
+	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *AppAccessResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var data AppAccessResourceModel
 
+	// Read Terraform prior state data into the model
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 
 	if resp.Diagnostics.HasError() {
@@ -156,24 +161,28 @@ func (r *AppAccessResource) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 
+	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *AppAccessResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var data AppAccessResourceModel
 
+	// Read Terraform plan data into the model
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
+	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *AppAccessResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var data AppAccessResourceModel
 
+	// Read Terraform prior state data into the model
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 
 	if resp.Diagnostics.HasError() {
