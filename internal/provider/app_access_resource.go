@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -18,7 +17,6 @@ import (
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var _ resource.Resource = &AppAccessResource{}
-var _ resource.ResourceWithImportState = &AppAccessResource{}
 
 func NewAppAccessResource() resource.Resource {
 	return &AppAccessResource{}
@@ -81,13 +79,6 @@ func (r *AppAccessResource) Configure(ctx context.Context, req resource.Configur
 	}
 
 	r.conn = authorizer.NewAuthorizerServiceClient(client.conn)
-	if r.conn == nil {
-		resp.Diagnostics.AddError(
-			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected *authorizer.AuthorizerServiceClient, got: %T. Please report this issue to the provider developers.", r.conn),
-		)
-		return
-	}
 	r.org = client.org
 }
 
@@ -139,7 +130,7 @@ func (r *AppAccessResource) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 
-	_, err := r.conn.GetIdentityAssignments(ctx, &authorizer.GetIdentityAssignmentRequest{
+	result, err := r.conn.GetIdentityAssignments(ctx, &authorizer.GetIdentityAssignmentRequest{
 		Organization: r.org,
 		Identity: &common.Identity{
 			Principal: &common.Identity_ApplicationId{
@@ -158,6 +149,19 @@ func (r *AppAccessResource) Read(ctx context.Context, req resource.ReadRequest, 
 			"Error Reading Application Access",
 			fmt.Sprintf("Error reading application access for app %s: %s", data.App.ValueString(), err),
 		)
+		return
+	}
+
+	// Verify the specific policy assignment still exists
+	var assigned bool
+	for _, p := range result.IdentityAssignment.Policies {
+		if p.Id.Name == data.Policy.ValueString() && p.Id.Organization == r.org {
+			assigned = true
+			break
+		}
+	}
+	if !assigned {
+		resp.State.RemoveResource(ctx)
 		return
 	}
 
@@ -207,14 +211,9 @@ func (r *AppAccessResource) Delete(ctx context.Context, req resource.DeleteReque
 	})
 	if err != nil {
 		if status.Code(err) == codes.NotFound {
-			resp.State.RemoveResource(ctx)
 			return
 		}
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete application access, got error: %s", err))
 		return
 	}
-}
-
-func (r *AppAccessResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }

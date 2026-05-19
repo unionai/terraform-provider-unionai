@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/unionai/cloud/gen/pb-go/authorizer"
+	"github.com/unionai/cloud/gen/pb-go/common"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -191,7 +192,13 @@ func TestAppAccessResource_Read_Success(t *testing.T) {
 			if appId == nil || appId.Subject != "my-app" {
 				t.Errorf("Expected app 'my-app' in read request")
 			}
-			return &authorizer.GetIdentityAssignmentResponse{}, nil
+			return &authorizer.GetIdentityAssignmentResponse{
+				IdentityAssignment: &authorizer.IdentityAssignment{
+					Policies: []*common.Policy{
+						{Id: &common.PolicyIdentifier{Name: "my-policy", Organization: "test-org"}},
+					},
+				},
+			}, nil
 		},
 	}
 
@@ -211,6 +218,36 @@ func TestAppAccessResource_Read_Success(t *testing.T) {
 	resp.State.Get(context.Background(), &data)
 	if data.App.ValueString() != "my-app" {
 		t.Errorf("Expected state preserved, got app '%s'", data.App.ValueString())
+	}
+}
+
+func TestAppAccessResource_Read_PolicyNoLongerAssigned(t *testing.T) {
+	mock := &mockAuthorizerClient{
+		getAssignFn: func(ctx context.Context, req *authorizer.GetIdentityAssignmentRequest) (*authorizer.GetIdentityAssignmentResponse, error) {
+			return &authorizer.GetIdentityAssignmentResponse{
+				IdentityAssignment: &authorizer.IdentityAssignment{
+					Policies: []*common.Policy{
+						{Id: &common.PolicyIdentifier{Name: "other-policy", Organization: "test-org"}},
+					},
+				},
+			}, nil
+		},
+	}
+
+	r := &AppAccessResource{conn: mock, org: "test-org"}
+
+	state := newTestState(t, "my-app", "my-policy")
+	req := resource.ReadRequest{State: state}
+	resp := &resource.ReadResponse{State: state}
+
+	r.Read(context.Background(), req, resp)
+
+	if resp.Diagnostics.HasError() {
+		t.Fatalf("Read() should not return errors, got: %v", resp.Diagnostics.Errors())
+	}
+
+	if !resp.State.Raw.IsNull() {
+		t.Error("Expected state to be removed when policy is no longer assigned")
 	}
 }
 
