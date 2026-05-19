@@ -2,16 +2,18 @@ package provider
 
 import (
 	"fmt"
+	"math/rand"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
 func TestAccAppAccessResource_ProjectScoped(t *testing.T) {
-	keyName := "tf-acc-test-app-access"
-	projectName := "tf-acc-test-project"
-	roleName := "tf-acc-test-role"
-	policyName := "tf-acc-test-policy"
+	suffix := fmt.Sprintf("%06d", rand.Intn(1000000))
+	keyName := "tf-acc-app-access-" + suffix
+	projectName := "tf-acc-project-" + suffix
+	roleName := "tf-acc-role-" + suffix
+	policyName := "tf-acc-policy-" + suffix
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
