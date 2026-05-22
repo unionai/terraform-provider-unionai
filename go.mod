@@ -2,7 +2,7 @@ module github.com/unionai/terraform-provider-unionai
 
 go 1.24.6
 
-replace github.com/unionai/cloud/gen/pb-go => ./proto
+replace github.com/unionai/cloud/gen/pb-go => ./proto/union
 
 require (
 	github.com/coreos/go-oidc/v3 v3.15.0
