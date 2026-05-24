@@ -32,20 +32,19 @@ type AppResource struct {
 
 // AppResourceModel describes the resource data model.
 type AppResourceModel struct {
-	Id                           types.String `tfsdk:"id"`
-	ClientId                     types.String `tfsdk:"client_id"`
-	ClientName                   types.String `tfsdk:"client_name"`
-	ClientUri                    types.String `tfsdk:"client_uri"`
-	ConsentMethod                types.String `tfsdk:"consent_method"`
-	GrantTypes                   types.Set    `tfsdk:"grant_types"`
-	LogoUri                      types.String `tfsdk:"logo_uri"`
-	PolicyUri                    types.String `tfsdk:"policy_uri"`
-	RedirectUris                 types.Set    `tfsdk:"redirect_uris"`
-	ResponseTypes                types.Set    `tfsdk:"response_types"`
-	SkipDefaultPolicyAssignments types.Bool   `tfsdk:"skip_default_policy_assignments"`
-	TokenEndpointAuthMethod      types.String `tfsdk:"token_endpoint_auth_method"`
-	TosUri                       types.String `tfsdk:"tos_uri"`
-	Secret                       types.String `tfsdk:"secret"`
+	Id                      types.String `tfsdk:"id"`
+	ClientId                types.String `tfsdk:"client_id"`
+	ClientName              types.String `tfsdk:"client_name"`
+	ClientUri               types.String `tfsdk:"client_uri"`
+	ConsentMethod           types.String `tfsdk:"consent_method"`
+	GrantTypes              types.Set    `tfsdk:"grant_types"`
+	LogoUri                 types.String `tfsdk:"logo_uri"`
+	PolicyUri               types.String `tfsdk:"policy_uri"`
+	RedirectUris            types.Set    `tfsdk:"redirect_uris"`
+	ResponseTypes           types.Set    `tfsdk:"response_types"`
+	TokenEndpointAuthMethod types.String `tfsdk:"token_endpoint_auth_method"`
+	TosUri                  types.String `tfsdk:"tos_uri"`
+	Secret                  types.String `tfsdk:"secret"`
 }
 
 func (r *AppResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -103,10 +102,6 @@ func (r *AppResource) Schema(ctx context.Context, req resource.SchemaRequest, re
 				ElementType:         types.StringType,
 				Optional:            true,
 				MarkdownDescription: "List of OAuth 2.0 response types the application may use",
-			},
-			"skip_default_policy_assignments": schema.BoolAttribute{
-				Optional:            true,
-				MarkdownDescription: "If true, create the OAuth app without assigning the default contributor policy. Defaults to true. Use this when access will be managed separately with application access resources.",
 			},
 			"token_endpoint_auth_method": schema.StringAttribute{
 				Optional:            true,
@@ -166,10 +161,6 @@ func (r *AppResource) Create(ctx context.Context, req resource.CreateRequest, re
 		return
 	}
 
-	if data.SkipDefaultPolicyAssignments.IsNull() || data.SkipDefaultPolicyAssignments.IsUnknown() {
-		data.SkipDefaultPolicyAssignments = types.BoolValue(true)
-	}
-
 	data.Id = data.ClientId // Our ID will match the client ID which is unique
 
 	if _, err := r.conn.Get(ctx, &identity.GetAppRequest{
@@ -191,7 +182,7 @@ func (r *AppResource) Create(ctx context.Context, req resource.CreateRequest, re
 		LogoUri:                      data.LogoUri.ValueString(),
 		PolicyUri:                    data.PolicyUri.ValueString(),
 		RedirectUris:                 convertSetToStrings(data.RedirectUris),
-		SkipDefaultPolicyAssignments: data.SkipDefaultPolicyAssignments.ValueBool(),
+		SkipDefaultPolicyAssignments: true,
 		TosUri:                       data.TosUri.ValueString(),
 	}
 
@@ -307,10 +298,6 @@ func (r *AppResource) Update(ctx context.Context, req resource.UpdateRequest, re
 
 	if resp.Diagnostics.HasError() {
 		return
-	}
-
-	if data.SkipDefaultPolicyAssignments.IsNull() || data.SkipDefaultPolicyAssignments.IsUnknown() {
-		data.SkipDefaultPolicyAssignments = types.BoolValue(true)
 	}
 
 	updateRequest := &identity.UpdateAppRequest{
