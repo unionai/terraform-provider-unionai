@@ -175,14 +175,15 @@ func (r *AppResource) Create(ctx context.Context, req resource.CreateRequest, re
 	}
 
 	createRequest := &identity.CreateAppRequest{
-		Organization: r.org,
-		ClientId:     data.ClientId.ValueString(),
-		ClientName:   data.ClientName.ValueString(),
-		ClientUri:    data.ClientUri.ValueString(),
-		LogoUri:      data.LogoUri.ValueString(),
-		PolicyUri:    data.PolicyUri.ValueString(),
-		RedirectUris: convertSetToStrings(data.RedirectUris),
-		TosUri:       data.TosUri.ValueString(),
+		Organization:                 r.org,
+		ClientId:                     data.ClientId.ValueString(),
+		ClientName:                   data.ClientName.ValueString(),
+		ClientUri:                    data.ClientUri.ValueString(),
+		LogoUri:                      data.LogoUri.ValueString(),
+		PolicyUri:                    data.PolicyUri.ValueString(),
+		RedirectUris:                 convertSetToStrings(data.RedirectUris),
+		SkipDefaultPolicyAssignments: true,
+		TosUri:                       data.TosUri.ValueString(),
 	}
 
 	if consent, ok := identity.ConsentMethod_value[strings.ToUpper(data.ConsentMethod.ValueString())]; !ok {

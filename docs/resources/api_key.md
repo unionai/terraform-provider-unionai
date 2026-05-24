@@ -40,6 +40,7 @@ output "api_key_secret" {
 - The `secret` attribute contains sensitive credentials. Ensure your Terraform state is stored securely.
 - The API key secret is only computed once during creation. If you lose access to the state file, you will need to create a new API key.
 - API keys created through this resource can be used with the Union CLI and API.
+- API keys always create their backing OAuth application with default policy assignments skipped. Manage access explicitly with application access resources if needed.
 
 ## Import
 

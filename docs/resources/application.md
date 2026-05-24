@@ -74,6 +74,7 @@ output "app_secret" {
 
 - The `secret` attribute contains sensitive OAuth credentials. Ensure your Terraform state is stored securely.
 - The application secret is only computed once during creation. If you lose access to the state file, you will need to create a new application.
+- Applications created through this resource always skip default policy assignments for their backing OAuth app. Manage access explicitly with application access resources if needed.
 
 ## Import
 

@@ -106,14 +106,15 @@ func (r *ApiKeyResource) Create(ctx context.Context, req resource.CreateRequest,
 	}
 
 	createRequest := &identity.CreateAppRequest{
-		Organization:            r.org,
-		ClientId:                data.Id.ValueString(),
-		ClientName:              data.Id.ValueString(),
-		ConsentMethod:           identity.ConsentMethod_CONSENT_METHOD_REQUIRED,
-		GrantTypes:              []identity.GrantTypes{identity.GrantTypes_CLIENT_CREDENTIALS, identity.GrantTypes_AUTHORIZATION_CODE},
-		ResponseTypes:           []identity.ResponseTypes{identity.ResponseTypes_CODE},
-		TokenEndpointAuthMethod: identity.TokenEndpointAuthMethod_CLIENT_SECRET_BASIC,
-		RedirectUris:            []string{"http://localhost:8080/authorization-code/callback"},
+		Organization:                 r.org,
+		ClientId:                     data.Id.ValueString(),
+		ClientName:                   data.Id.ValueString(),
+		ConsentMethod:                identity.ConsentMethod_CONSENT_METHOD_REQUIRED,
+		GrantTypes:                   []identity.GrantTypes{identity.GrantTypes_CLIENT_CREDENTIALS, identity.GrantTypes_AUTHORIZATION_CODE},
+		ResponseTypes:                []identity.ResponseTypes{identity.ResponseTypes_CODE},
+		SkipDefaultPolicyAssignments: true,
+		TokenEndpointAuthMethod:      identity.TokenEndpointAuthMethod_CLIENT_SECRET_BASIC,
+		RedirectUris:                 []string{"http://localhost:8080/authorization-code/callback"},
 	}
 
 	app, err := r.conn.Create(ctx, createRequest)

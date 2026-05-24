@@ -79,6 +79,8 @@ func (m *CreateAppRequest) validate(all bool) error {
 
 	// no validation rules for ConsentMethod
 
+	// no validation rules for SkipDefaultPolicyAssignments
+
 	if len(errors) > 0 {
 		return CreateAppRequestMultiError(errors)
 	}
