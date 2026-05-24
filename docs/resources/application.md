@@ -62,6 +62,7 @@ output "app_secret" {
 - `policy_uri` (String) URI that the application provides to end-users to read about how their profile data will be used.
 - `redirect_uris` (Set of String) List of valid redirect URIs for OAuth callbacks.
 - `response_types` (Set of String) List of OAuth 2.0 response types the application may use. Common values: `CODE`, `TOKEN`.
+- `skip_default_policy_assignments` (Boolean) If `true`, creates the OAuth application without assigning the default contributor policy. Defaults to `true`. Use this when you plan to manage application access separately, for example with `unionai_application_access`.
 - `token_endpoint_auth_method` (String) Authentication method for the token endpoint. Common values: `CLIENT_SECRET_BASIC`, `CLIENT_SECRET_POST`.
 - `tos_uri` (String) URI that the application provides to end-users for terms of service.
 
