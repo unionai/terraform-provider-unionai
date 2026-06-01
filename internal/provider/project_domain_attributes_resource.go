@@ -29,7 +29,7 @@ func NewProjectDomainAttributesResource() resource.Resource {
 // (matchable attributes of type CLUSTER_RESOURCE) for a project-domain pair.
 // These attributes are substituted into the cluster resource templates that
 // Flyte renders per project-domain namespace — most commonly to set a
-// per-project IAM role via the defaultIamRole template variable.
+// per-project IAM role via the defaultUserRoleValue template variable.
 type ProjectDomainAttributesResource struct {
 	conn service.AdminServiceClient
 	org  string
@@ -51,7 +51,7 @@ func (r *ProjectDomainAttributesResource) Schema(ctx context.Context, req resour
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Cluster resource attributes (matchable attributes of type `CLUSTER_RESOURCE`) for a project-domain pair. " +
 			"The attribute map is substituted into the cluster resource templates Flyte renders for the project-domain namespace " +
-			"(e.g. `defaultIamRole` to bind a per-project IAM role to the namespace's default ServiceAccount).",
+			"(e.g. `defaultUserRoleValue` to bind a per-project IAM role to the namespace's default ServiceAccount).",
 
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
@@ -77,7 +77,7 @@ func (r *ProjectDomainAttributesResource) Schema(ctx context.Context, req resour
 			},
 			"attributes": schema.MapAttribute{
 				MarkdownDescription: "Cluster resource template variables to substitute, as case-sensitive key/value pairs " +
-					"(e.g. `{ defaultIamRole = \"arn:aws:iam::123456789012:role/my-role\" }`).",
+					"(e.g. `{ defaultUserRoleValue = \"arn:aws:iam::123456789012:role/my-role\" }`).",
 				ElementType: types.StringType,
 				Required:    true,
 			},

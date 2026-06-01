@@ -130,7 +130,7 @@ func TestProjectDomainAttributesResource_Create(t *testing.T) {
 
 	resp := &resource.CreateResponse{State: tfsdk.State{Schema: projectDomainAttributesSchema(t).Schema}}
 	r.Create(context.Background(), resource.CreateRequest{
-		Plan: newPDAPlan(t, "myproj", "development", map[string]string{"defaultIamRole": "arn:aws:iam::123:role/x"}),
+		Plan: newPDAPlan(t, "myproj", "development", map[string]string{"defaultUserRoleValue": "arn:aws:iam::123:role/x"}),
 	}, resp)
 
 	if resp.Diagnostics.HasError() {
@@ -144,7 +144,7 @@ func TestProjectDomainAttributesResource_Create(t *testing.T) {
 		t.Errorf("unexpected request scope: %+v", pda)
 	}
 	cra := pda.GetMatchingAttributes().GetClusterResourceAttributes()
-	if cra == nil || cra.GetAttributes()["defaultIamRole"] != "arn:aws:iam::123:role/x" {
+	if cra == nil || cra.GetAttributes()["defaultUserRoleValue"] != "arn:aws:iam::123:role/x" {
 		t.Errorf("unexpected cluster resource attributes: %+v", cra)
 	}
 }
@@ -164,7 +164,7 @@ func TestProjectDomainAttributesResource_Read(t *testing.T) {
 						MatchingAttributes: &admin.MatchingAttributes{
 							Target: &admin.MatchingAttributes_ClusterResourceAttributes{
 								ClusterResourceAttributes: &admin.ClusterResourceAttributes{
-									Attributes: map[string]string{"defaultIamRole": "arn:aws:iam::123:role/x"},
+									Attributes: map[string]string{"defaultUserRoleValue": "arn:aws:iam::123:role/x"},
 								},
 							},
 						},
@@ -176,7 +176,7 @@ func TestProjectDomainAttributesResource_Read(t *testing.T) {
 
 	resp := &resource.ReadResponse{State: tfsdk.State{Schema: projectDomainAttributesSchema(t).Schema}}
 	r.Read(context.Background(), resource.ReadRequest{
-		State: newPDAState(t, "myproj", "development", map[string]string{"defaultIamRole": "stale"}),
+		State: newPDAState(t, "myproj", "development", map[string]string{"defaultUserRoleValue": "stale"}),
 	}, resp)
 
 	if resp.Diagnostics.HasError() {

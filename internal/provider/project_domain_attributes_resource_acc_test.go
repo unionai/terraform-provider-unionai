@@ -17,13 +17,13 @@ func TestAccProjectDomainAttributesResource(t *testing.T) {
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
-			// Create with a single defaultIamRole attribute.
+			// Create with a single defaultUserRoleValue attribute.
 			{
 				Config: testAccProjectDomainAttributesConfig(projectName, roleArn),
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr("unionai_project_domain_attributes.test", "project", projectName),
 					resource.TestCheckResourceAttr("unionai_project_domain_attributes.test", "domain", "development"),
-					resource.TestCheckResourceAttr("unionai_project_domain_attributes.test", "attributes.defaultIamRole", roleArn),
+					resource.TestCheckResourceAttr("unionai_project_domain_attributes.test", "attributes.defaultUserRoleValue", roleArn),
 					resource.TestCheckResourceAttr("unionai_project_domain_attributes.test", "id", projectName+"/development"),
 				),
 			},
@@ -31,7 +31,7 @@ func TestAccProjectDomainAttributesResource(t *testing.T) {
 			{
 				Config: testAccProjectDomainAttributesConfig(projectName, roleArn+"-updated"),
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr("unionai_project_domain_attributes.test", "attributes.defaultIamRole", roleArn+"-updated"),
+					resource.TestCheckResourceAttr("unionai_project_domain_attributes.test", "attributes.defaultUserRoleValue", roleArn+"-updated"),
 				),
 			},
 			// Import.
@@ -58,7 +58,7 @@ resource "unionai_project_domain_attributes" "test" {
   domain  = "development"
 
   attributes = {
-    defaultIamRole = %[2]q
+    defaultUserRoleValue = %[2]q
   }
 }
 `, projectName, roleArn)

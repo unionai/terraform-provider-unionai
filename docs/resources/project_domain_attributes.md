@@ -9,7 +9,7 @@ description: |-
 
 Manages the cluster resource attributes (matchable attributes of type `CLUSTER_RESOURCE`) for a project-domain pair.
 
-The attribute map is substituted into the cluster resource templates that Flyte renders for the project-domain namespace. The most common use is setting `defaultIamRole` to bind a per-project IAM role to the namespace's default ServiceAccount, giving each project-domain its own scoped cloud identity.
+The attribute map is substituted into the cluster resource templates that Flyte renders for the project-domain namespace. The most common use is setting `defaultUserRoleValue` to bind a per-project IAM role to the namespace's default ServiceAccount, giving each project-domain its own scoped cloud identity.
 
 ## Example Usage
 
@@ -20,13 +20,13 @@ resource "unionai_project" "test" {
 }
 
 # Bind a per-project IAM role to the project-domain namespace's default
-# ServiceAccount by setting the defaultIamRole cluster resource template variable.
+# ServiceAccount by setting the defaultUserRoleValue cluster resource template variable.
 resource "unionai_project_domain_attributes" "test" {
   project = unionai_project.test.id
   domain  = "development"
 
   attributes = {
-    defaultIamRole = "arn:aws:iam::123456789012:role/my-project-development-role"
+    defaultUserRoleValue = "arn:aws:iam::123456789012:role/my-project-development-role"
   }
 }
 ```
@@ -37,7 +37,7 @@ resource "unionai_project_domain_attributes" "test" {
 
 - `project` (String) Project identifier the attributes apply to.
 - `domain` (String) Domain the attributes apply to (e.g. `development`, `staging`, `production`).
-- `attributes` (Map of String) Cluster resource template variables to substitute, as case-sensitive key/value pairs (e.g. `{ defaultIamRole = "arn:aws:iam::123456789012:role/my-role" }`).
+- `attributes` (Map of String) Cluster resource template variables to substitute, as case-sensitive key/value pairs (e.g. `{ defaultUserRoleValue = "arn:aws:iam::123456789012:role/my-role" }`).
 
 ### Read-Only
 
