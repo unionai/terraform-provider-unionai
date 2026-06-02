@@ -49,6 +49,10 @@ terraform {
 provider "unionai" {
   api_key = var.unionai_api_key
 
+  # Optional: Override organization when it is not encoded in the API key
+  # or differs from the control plane URL
+  org = "your-org-name"
+
   # Optional: Restrict to specific organizations
   allowed_orgs = ["your-org-name"]
 }

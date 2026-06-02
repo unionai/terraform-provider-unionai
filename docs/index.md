@@ -23,6 +23,10 @@ provider "unionai" {
   # API key for authentication - can also be set via UNIONAI_API_KEY environment variable
   api_key = "your-api-key"
 
+  # Optional: Override the organization name when it is not encoded in the API key
+  # or differs from the control plane URL
+  org = "your-org-name"
+
   # Optional: Restrict operations to specific organizations
   allowed_orgs = [
     "your-org-name",
@@ -52,6 +56,7 @@ There are no required arguments for the provider configuration. However, you mus
 ### Optional
 
 - `api_key` (String, Sensitive) - Union.ai API key for authentication. Can also be set via the `UNIONAI_API_KEY` environment variable.
+- `org` (String) - Union.ai organization name. If set, this takes precedence over the organization encoded in the API key or inferred from the API key host. Use this when the control plane's organization name differs from the URL it is served from.
 - `allowed_orgs` (Set of String) - List of organization names that this provider is allowed to manage. If specified, the provider will only allow operations on resources belonging to these organizations. This is useful to avoid unintended side effects when using multiple credentials or working with multiple organizations. Can also be set via the `UNIONAI_ALLOWED_ORGS` environment variable (comma-separated list).
 
 ## Organization Restriction

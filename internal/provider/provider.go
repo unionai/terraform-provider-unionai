@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"os"
-	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
@@ -13,7 +12,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/credentials/oauth"
 )
 
 // Ensure UnionProvider satisfies various provider interfaces.
@@ -27,6 +25,7 @@ type UnionaiProvider struct {
 // UnionaiProviderModel describes the provider data model.
 type UnionaiProviderModel struct {
 	ApiKey      types.String `tfsdk:"api_key"`
+	Org         types.String `tfsdk:"org"`
 	AllowedOrgs types.Set    `tfsdk:"allowed_orgs"`
 }
 
@@ -47,6 +46,10 @@ func (p *UnionaiProvider) Schema(ctx context.Context, req provider.SchemaRequest
 			"api_key": schema.StringAttribute{
 				MarkdownDescription: "Unionai API key",
 				Optional:            true, // they can be specified by UNIONAI_API_KEY
+			},
+			"org": schema.StringAttribute{
+				MarkdownDescription: "Union.ai organization name. If set, this takes precedence over the organization encoded in the API key or inferred from the API key host. Use this when the control plane's organization name differs from the URL it is served from.",
+				Optional:            true,
 			},
 			"allowed_orgs": schema.SetAttribute{
 				MarkdownDescription: "Unionai allowed orgs",
@@ -78,18 +81,21 @@ func (p *UnionaiProvider) Configure(ctx context.Context, req provider.ConfigureR
 		return
 	}
 
-	// Get OAuth2 token source using OpenID configuration
-	token, host, err := GetApiToken(apiKey)
+	// Get OAuth2 token source using Union auth metadata where available.
+	apiTokenConfig, err := GetApiToken(apiKey)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get OAuth2 token", err.Error())
 		return
 	}
+	if data.Org.ValueString() != "" {
+		apiTokenConfig.Org = data.Org.ValueString()
+	}
 
 	// Create gRPC connection with OAuth2 credentials
 	conn, err := grpc.NewClient(
-		*host,
+		apiTokenConfig.Host,
 		grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{})),
-		grpc.WithPerRPCCredentials(oauth.TokenSource{TokenSource: token}),
+		grpc.WithPerRPCCredentials(NewTokenSourceCredentials(apiTokenConfig.TokenSource, apiTokenConfig.AuthorizationMetadataKey)),
 	)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to connect to Unionai host", err.Error())
@@ -98,8 +104,8 @@ func (p *UnionaiProvider) Configure(ctx context.Context, req provider.ConfigureR
 
 	client := &providerContext{
 		conn: conn,
-		org:  strings.Split(strings.TrimPrefix(strings.TrimPrefix(*host, "https://"), "dns:///"), ".")[0],
-		host: *host,
+		org:  apiTokenConfig.Org,
+		host: apiTokenConfig.Host,
 	}
 	resp.DataSourceData = client
 	resp.ResourceData = client
