@@ -4,13 +4,13 @@ import (
 	"context"
 	"crypto/tls"
 	"os"
-	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
@@ -83,6 +83,14 @@ func (p *UnionaiProvider) Configure(ctx context.Context, req provider.ConfigureR
 		resp.Diagnostics.AddError("Failed to get OAuth2 token", err.Error())
 		return
 	}
+	tflog.Debug(ctx, "Resolved API token config", map[string]interface{}{
+		"host":                       apiTokenConfig.Host,
+		"org":                        apiTokenConfig.Org,
+		"authorization_metadata_key": apiTokenConfig.AuthorizationMetadataKey,
+		"scopes":                     apiTokenConfig.Scopes,
+		"audience":                   apiTokenConfig.Audience,
+		"token_source_configured":    apiTokenConfig.TokenSource != nil,
+	})
 
 	// Create gRPC connection with OAuth2 credentials
 	conn, err := grpc.NewClient(
@@ -97,7 +105,7 @@ func (p *UnionaiProvider) Configure(ctx context.Context, req provider.ConfigureR
 
 	client := &providerContext{
 		conn: conn,
-		org:  strings.Split(strings.TrimPrefix(strings.TrimPrefix(apiTokenConfig.Host, "https://"), "dns:///"), ".")[0],
+		org:  apiTokenConfig.Org,
 		host: apiTokenConfig.Host,
 	}
 	resp.DataSourceData = client

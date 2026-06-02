@@ -59,18 +59,37 @@ func (c TokenSourceCredentials) RequireTransportSecurity() bool {
 type ApiTokenConfig struct {
 	TokenSource              *TokenSource
 	Host                     string
+	Org                      string
 	AuthorizationMetadataKey string
+	Scopes                   []string
+	Audience                 string
 }
 
 type oauthAuthorizationServerMetadata struct {
-	Issuer        string `json:"issuer"`
-	TokenEndpoint string `json:"token_endpoint"`
+	Issuer             string `json:"issuer"`
+	TokenEndpoint      string `json:"token_endpoint"`
+	TokenEndpointCamel string `json:"tokenEndpoint"`
 }
 
 type publicClientConfig struct {
-	Scopes                   []string `json:"scopes"`
-	Audience                 string   `json:"audience"`
-	AuthorizationMetadataKey string   `json:"authorization_metadata_key"`
+	Scopes                            []string `json:"scopes"`
+	Audience                          string   `json:"audience"`
+	AuthorizationMetadataKey          string   `json:"authorization_metadata_key"`
+	AuthorizationMetadataKeyCamelCase string   `json:"authorizationMetadataKey"`
+}
+
+func (m oauthAuthorizationServerMetadata) getTokenEndpoint() string {
+	if m.TokenEndpoint != "" {
+		return m.TokenEndpoint
+	}
+	return m.TokenEndpointCamel
+}
+
+func (c publicClientConfig) getAuthorizationMetadataKey() string {
+	if c.AuthorizationMetadataKey != "" {
+		return c.AuthorizationMetadataKey
+	}
+	return c.AuthorizationMetadataKeyCamelCase
 }
 
 func authMetadataURL(host, path string) string {
@@ -104,7 +123,7 @@ func discoverUnionAuthMetadata(host string) (*oauthAuthorizationServerMetadata, 
 	if err := fetchJSON(authMetadataURL(host, "/.well-known/oauth-authorization-server"), &oauthMetadata); err != nil {
 		return nil, nil, err
 	}
-	if oauthMetadata.TokenEndpoint == "" {
+	if oauthMetadata.getTokenEndpoint() == "" {
 		return nil, nil, fmt.Errorf("token_endpoint not found in OAuth authorization server metadata")
 	}
 
@@ -142,9 +161,12 @@ func GetApiToken(apiKey string) (*ApiTokenConfig, error) {
 	ctx := context.Background()
 
 	// Decode API key
-	host, clientID, clientSecret, err := decodeApiKey(apiKey)
+	host, clientID, clientSecret, org, err := decodeApiKey(apiKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode API key: %w", err)
+	}
+	if org == "" || strings.EqualFold(org, "none") {
+		org = orgFromHost(host)
 	}
 
 	tokenURL := ""
@@ -154,11 +176,11 @@ func GetApiToken(apiKey string) (*ApiTokenConfig, error) {
 
 	oauthMetadata, clientConfig, err := discoverUnionAuthMetadata(host)
 	if err == nil {
-		tokenURL = oauthMetadata.TokenEndpoint
+		tokenURL = oauthMetadata.getTokenEndpoint()
 		scopes = clientConfig.Scopes
 		audience = clientConfig.Audience
-		if clientConfig.AuthorizationMetadataKey != "" {
-			authorizationMetadataKey = clientConfig.AuthorizationMetadataKey
+		if clientConfig.getAuthorizationMetadataKey() != "" {
+			authorizationMetadataKey = clientConfig.getAuthorizationMetadataKey()
 		}
 	} else {
 		// Fall back to the older OIDC discovery behavior for deployments that do
@@ -192,7 +214,6 @@ func GetApiToken(apiKey string) (*ApiTokenConfig, error) {
 			"audience": []string{audience},
 		}
 	}
-
 	// Get the token
 	token, err := config.Token(tokenCtx)
 	if err != nil {
@@ -202,22 +223,30 @@ func GetApiToken(apiKey string) (*ApiTokenConfig, error) {
 	return &ApiTokenConfig{
 		TokenSource:              &TokenSource{token: token},
 		Host:                     host,
+		Org:                      org,
 		AuthorizationMetadataKey: authorizationMetadataKey,
+		Scopes:                   scopes,
+		Audience:                 audience,
 	}, nil
 }
 
-func decodeApiKey(apiKey string) (string, string, string, error) {
+func decodeApiKey(apiKey string) (string, string, string, string, error) {
 	// base64 decode the key
 	decodedKey, err := base64.StdEncoding.DecodeString(apiKey)
 	if err != nil {
-		return "", "", "", fmt.Errorf("failed to decode API key: %w", err)
+		return "", "", "", "", fmt.Errorf("failed to decode API key: %w", err)
 	}
 
-	// API key format: serverURL:clientID:clientSecret:None
+	// API key format: serverURL:clientID:clientSecret:org
 	parts := strings.SplitN(string(decodedKey), ":", 4)
 	if len(parts) != 4 {
-		return "", "", "", fmt.Errorf("invalid API key format")
+		return "", "", "", "", fmt.Errorf("invalid API key format")
 	}
 
-	return parts[0], parts[1], parts[2], nil
+	return parts[0], parts[1], parts[2], parts[3], nil
+}
+
+func orgFromHost(host string) string {
+	normalizedHost := strings.TrimPrefix(strings.TrimPrefix(host, "https://"), "dns:///")
+	return strings.Split(normalizedHost, ".")[0]
 }

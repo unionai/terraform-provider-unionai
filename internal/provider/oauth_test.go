@@ -28,14 +28,14 @@ func TestGetApiTokenUsesUnionAuthMetadata(t *testing.T) {
 		Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 			switch r.URL.Path {
 			case "/.well-known/oauth-authorization-server":
-				return jsonResponse(t, oauthAuthorizationServerMetadata{
-					TokenEndpoint: "https://union.test/token",
+				return jsonResponse(t, map[string]any{
+					"tokenEndpoint": "https://union.test/token",
 				}), nil
 			case "/config/v1/flyte_client":
-				return jsonResponse(t, publicClientConfig{
-					Scopes:                   []string{"scope-one", "scope-two"},
-					Audience:                 "api://union-test",
-					AuthorizationMetadataKey: "x-union-authorization",
+				return jsonResponse(t, map[string]any{
+					"scopes":                   []string{"scope-one", "scope-two"},
+					"audience":                 "api://union-test",
+					"authorizationMetadataKey": "x-union-authorization",
 				}), nil
 			case "/token":
 				if err := r.ParseForm(); err != nil {
@@ -60,7 +60,7 @@ func TestGetApiTokenUsesUnionAuthMetadata(t *testing.T) {
 		}),
 	}
 
-	apiKey := encodeAPIKey("union.test", "client-id", "client-secret", "None")
+	apiKey := encodeAPIKey("union.test", "client-id", "client-secret", "new-org")
 	cfg, err := GetApiToken(apiKey)
 	if err != nil {
 		t.Fatalf("GetApiToken returned error: %v", err)
@@ -78,8 +78,17 @@ func TestGetApiTokenUsesUnionAuthMetadata(t *testing.T) {
 	if cfg.Host != "union.test" {
 		t.Fatalf("unexpected host: %q", cfg.Host)
 	}
+	if cfg.Org != "new-org" {
+		t.Fatalf("unexpected org: %q", cfg.Org)
+	}
 	if cfg.AuthorizationMetadataKey != "x-union-authorization" {
 		t.Fatalf("unexpected authorization metadata key: %q", cfg.AuthorizationMetadataKey)
+	}
+	if strings.Join(cfg.Scopes, " ") != "scope-one scope-two" {
+		t.Fatalf("unexpected scopes: %v", cfg.Scopes)
+	}
+	if cfg.Audience != "api://union-test" {
+		t.Fatalf("unexpected audience: %q", cfg.Audience)
 	}
 
 	token, err := cfg.TokenSource.Token()
@@ -101,8 +110,8 @@ func TestGetApiTokenUsesDefaultAuthorizationMetadataKey(t *testing.T) {
 		Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 			switch r.URL.Path {
 			case "/.well-known/oauth-authorization-server":
-				return jsonResponse(t, oauthAuthorizationServerMetadata{
-					TokenEndpoint: "https://union.test/token",
+				return jsonResponse(t, map[string]any{
+					"tokenEndpoint": "https://union.test/token",
 				}), nil
 			case "/config/v1/flyte_client":
 				return jsonResponse(t, publicClientConfig{}), nil
@@ -130,6 +139,20 @@ func TestGetApiTokenUsesDefaultAuthorizationMetadataKey(t *testing.T) {
 
 	if cfg.AuthorizationMetadataKey != defaultAuthorizationMetadataKey {
 		t.Fatalf("unexpected authorization metadata key: %q", cfg.AuthorizationMetadataKey)
+	}
+	if cfg.Org != "union" {
+		t.Fatalf("expected org to fall back to host prefix, got %q", cfg.Org)
+	}
+}
+
+func TestDecodeApiKeyReturnsOrg(t *testing.T) {
+	host, clientID, clientSecret, org, err := decodeApiKey(encodeAPIKey("union.test", "client-id", "client-secret", "org-name"))
+	if err != nil {
+		t.Fatalf("decodeApiKey returned error: %v", err)
+	}
+
+	if host != "union.test" || clientID != "client-id" || clientSecret != "client-secret" || org != "org-name" {
+		t.Fatalf("unexpected decoded API key parts: host=%q clientID=%q clientSecret=%q org=%q", host, clientID, clientSecret, org)
 	}
 }
 
