@@ -32,7 +32,6 @@ func NewProjectDomainAttributesResource() resource.Resource {
 // per-project IAM role via the defaultUserRoleValue template variable.
 type ProjectDomainAttributesResource struct {
 	conn service.AdminServiceClient
-	org  string
 }
 
 // ProjectDomainAttributesResourceModel describes the resource data model.
@@ -110,7 +109,6 @@ func (r *ProjectDomainAttributesResource) Configure(ctx context.Context, req res
 		)
 		return
 	}
-	r.org = client.org
 }
 
 // upsert applies the attribute map to the project-domain via the matchable
@@ -127,7 +125,6 @@ func (r *ProjectDomainAttributesResource) upsert(ctx context.Context, data *Proj
 		Attributes: &admin.ProjectDomainAttributes{
 			Project: data.Project.ValueString(),
 			Domain:  data.Domain.ValueString(),
-			Org:     r.org,
 			MatchingAttributes: &admin.MatchingAttributes{
 				Target: &admin.MatchingAttributes_ClusterResourceAttributes{
 					ClusterResourceAttributes: &admin.ClusterResourceAttributes{
@@ -169,7 +166,6 @@ func (r *ProjectDomainAttributesResource) Read(ctx context.Context, req resource
 	got, err := r.conn.GetProjectDomainAttributes(ctx, &admin.ProjectDomainAttributesGetRequest{
 		Project:      data.Project.ValueString(),
 		Domain:       data.Domain.ValueString(),
-		Org:          r.org,
 		ResourceType: admin.MatchableResource_CLUSTER_RESOURCE,
 	})
 	if err != nil {
@@ -228,7 +224,6 @@ func (r *ProjectDomainAttributesResource) Delete(ctx context.Context, req resour
 	_, err := r.conn.DeleteProjectDomainAttributes(ctx, &admin.ProjectDomainAttributesDeleteRequest{
 		Project:      data.Project.ValueString(),
 		Domain:       data.Domain.ValueString(),
-		Org:          r.org,
 		ResourceType: admin.MatchableResource_CLUSTER_RESOURCE,
 	})
 	if err != nil {

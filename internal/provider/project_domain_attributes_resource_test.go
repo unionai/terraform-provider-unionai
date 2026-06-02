@@ -119,7 +119,6 @@ func newPDAState(t *testing.T, project, domain string, attrs map[string]string) 
 func TestProjectDomainAttributesResource_Create(t *testing.T) {
 	var captured *admin.ProjectDomainAttributesUpdateRequest
 	r := &ProjectDomainAttributesResource{
-		org: "test-org",
 		conn: &mockAdminClient{
 			updateFn: func(ctx context.Context, req *admin.ProjectDomainAttributesUpdateRequest) (*admin.ProjectDomainAttributesUpdateResponse, error) {
 				captured = req
@@ -140,7 +139,7 @@ func TestProjectDomainAttributesResource_Create(t *testing.T) {
 		t.Fatal("UpdateProjectDomainAttributes was not called")
 	}
 	pda := captured.GetAttributes()
-	if pda.GetProject() != "myproj" || pda.GetDomain() != "development" || pda.GetOrg() != "test-org" {
+	if pda.GetProject() != "myproj" || pda.GetDomain() != "development" {
 		t.Errorf("unexpected request scope: %+v", pda)
 	}
 	cra := pda.GetMatchingAttributes().GetClusterResourceAttributes()
@@ -151,7 +150,6 @@ func TestProjectDomainAttributesResource_Create(t *testing.T) {
 
 func TestProjectDomainAttributesResource_Read(t *testing.T) {
 	r := &ProjectDomainAttributesResource{
-		org: "test-org",
 		conn: &mockAdminClient{
 			getFn: func(ctx context.Context, req *admin.ProjectDomainAttributesGetRequest) (*admin.ProjectDomainAttributesGetResponse, error) {
 				if req.GetResourceType() != admin.MatchableResource_CLUSTER_RESOURCE {
@@ -192,7 +190,6 @@ func TestProjectDomainAttributesResource_Read(t *testing.T) {
 
 func TestProjectDomainAttributesResource_ReadNotFound(t *testing.T) {
 	r := &ProjectDomainAttributesResource{
-		org: "test-org",
 		conn: &mockAdminClient{
 			getFn: func(ctx context.Context, req *admin.ProjectDomainAttributesGetRequest) (*admin.ProjectDomainAttributesGetResponse, error) {
 				return nil, status.Error(codes.NotFound, "not found")
@@ -217,7 +214,6 @@ func TestProjectDomainAttributesResource_ReadNotFound(t *testing.T) {
 func TestProjectDomainAttributesResource_Delete(t *testing.T) {
 	called := false
 	r := &ProjectDomainAttributesResource{
-		org: "test-org",
 		conn: &mockAdminClient{
 			deleteFn: func(ctx context.Context, req *admin.ProjectDomainAttributesDeleteRequest) (*admin.ProjectDomainAttributesDeleteResponse, error) {
 				called = true
