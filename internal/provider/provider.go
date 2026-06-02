@@ -13,7 +13,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/credentials/oauth"
 )
 
 // Ensure UnionProvider satisfies various provider interfaces.
@@ -78,8 +77,8 @@ func (p *UnionaiProvider) Configure(ctx context.Context, req provider.ConfigureR
 		return
 	}
 
-	// Get OAuth2 token source using OpenID configuration
-	token, host, err := GetApiToken(apiKey)
+	// Get OAuth2 token source using Union auth metadata where available.
+	apiTokenConfig, err := GetApiToken(apiKey)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get OAuth2 token", err.Error())
 		return
@@ -87,9 +86,9 @@ func (p *UnionaiProvider) Configure(ctx context.Context, req provider.ConfigureR
 
 	// Create gRPC connection with OAuth2 credentials
 	conn, err := grpc.NewClient(
-		*host,
+		apiTokenConfig.Host,
 		grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{})),
-		grpc.WithPerRPCCredentials(oauth.TokenSource{TokenSource: token}),
+		grpc.WithPerRPCCredentials(NewTokenSourceCredentials(apiTokenConfig.TokenSource, apiTokenConfig.AuthorizationMetadataKey)),
 	)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to connect to Unionai host", err.Error())
@@ -98,8 +97,8 @@ func (p *UnionaiProvider) Configure(ctx context.Context, req provider.ConfigureR
 
 	client := &providerContext{
 		conn: conn,
-		org:  strings.Split(strings.TrimPrefix(strings.TrimPrefix(*host, "https://"), "dns:///"), ".")[0],
-		host: *host,
+		org:  strings.Split(strings.TrimPrefix(strings.TrimPrefix(apiTokenConfig.Host, "https://"), "dns:///"), ".")[0],
+		host: apiTokenConfig.Host,
 	}
 	resp.DataSourceData = client
 	resp.ResourceData = client
