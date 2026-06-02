@@ -102,7 +102,7 @@ func TestUnionaiProvider_Resources(t *testing.T) {
 
 	resources := p.Resources(context.Background())
 
-	expectedResourceCount := 9
+	expectedResourceCount := 10
 	if len(resources) != expectedResourceCount {
 		t.Errorf("Expected %d resources, got %d", expectedResourceCount, len(resources))
 	}
