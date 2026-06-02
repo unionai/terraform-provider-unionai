@@ -25,6 +25,7 @@ type UnionaiProvider struct {
 // UnionaiProviderModel describes the provider data model.
 type UnionaiProviderModel struct {
 	ApiKey      types.String `tfsdk:"api_key"`
+	Org         types.String `tfsdk:"org"`
 	AllowedOrgs types.Set    `tfsdk:"allowed_orgs"`
 }
 
@@ -45,6 +46,10 @@ func (p *UnionaiProvider) Schema(ctx context.Context, req provider.SchemaRequest
 			"api_key": schema.StringAttribute{
 				MarkdownDescription: "Unionai API key",
 				Optional:            true, // they can be specified by UNIONAI_API_KEY
+			},
+			"org": schema.StringAttribute{
+				MarkdownDescription: "Union.ai organization name. If set, this takes precedence over the organization encoded in the API key or inferred from the API key host. Use this when the control plane's organization name differs from the URL it is served from.",
+				Optional:            true,
 			},
 			"allowed_orgs": schema.SetAttribute{
 				MarkdownDescription: "Unionai allowed orgs",
@@ -81,6 +86,9 @@ func (p *UnionaiProvider) Configure(ctx context.Context, req provider.ConfigureR
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get OAuth2 token", err.Error())
 		return
+	}
+	if data.Org.ValueString() != "" {
+		apiTokenConfig.Org = data.Org.ValueString()
 	}
 
 	// Create gRPC connection with OAuth2 credentials

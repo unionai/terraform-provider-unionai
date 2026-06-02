@@ -23,6 +23,10 @@ provider "unionai" {
   # API key for authentication - can also be set via UNIONAI_API_KEY environment variable
   api_key = var.unionai_api_key
 
+  # Optional: Override the organization name if it is not encoded in the API key
+  # or differs from the control plane URL
+  org = "your-org-name"
+
   # Optional: Restrict operations to specific organizations
   allowed_orgs = ["your-org-name"]
 }
@@ -39,6 +43,11 @@ union create api-key admin --name "terraform-api-key"
 The API key can be provided in two ways:
 1. Set the `api_key` attribute in the provider configuration
 2. Set the `UNIONAI_API_KEY` environment variable
+
+If the organization name is not encoded in the API key, or if the control plane
+is served from a URL that differs from the organization name, set the optional
+`org` provider attribute. This value takes precedence over the API key org and
+the host-derived fallback.
 
 ## Documentation
 

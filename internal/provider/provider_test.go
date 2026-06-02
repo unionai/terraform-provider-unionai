@@ -91,6 +91,9 @@ func TestUnionaiProvider_Schema(t *testing.T) {
 	if _, exists := resp.Schema.Attributes["api_key"]; !exists {
 		t.Error("Expected 'api_key' attribute in schema")
 	}
+	if _, exists := resp.Schema.Attributes["org"]; !exists {
+		t.Error("Expected 'org' attribute in schema")
+	}
 }
 
 // TestUnionaiProvider_Resources tests that all expected resources are registered
