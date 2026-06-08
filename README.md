@@ -68,7 +68,7 @@ operations on resources in the allowed organizations.
 - `unionai_api_key` - Manage API keys
 - `unionai_application` - Manage OAuth applications
 - `unionai_user_access` - Assign policies to users
-- `unionai_app_access` - Assign policies to applications
+- `unionai_application_access` - Assign policies to applications
 
 ## Available Data Sources
 
