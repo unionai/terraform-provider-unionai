@@ -1,11 +1,11 @@
 ---
-page_title: "unionai_app_access Resource - terraform-provider-unionai"
+page_title: "unionai_application_access Resource - terraform-provider-unionai"
 subcategory: ""
 description: |-
   Manages access policies for a Union.ai application.
 ---
 
-# unionai_app_access (Resource)
+# unionai_application_access (Resource)
 
 Manages access policies for a Union.ai application. This resource assigns policies to applications, granting them specific permissions.
 
@@ -30,7 +30,7 @@ resource "unionai_policy" "ci_access" {
   }
 }
 
-resource "unionai_app_access" "ci_permissions" {
+resource "unionai_application_access" "ci_permissions" {
   app_id    = unionai_application.ci_app.id
   policy_id = unionai_policy.ci_access.id
 }
@@ -52,5 +52,5 @@ resource "unionai_app_access" "ci_permissions" {
 Application access assignments can be imported using their ID:
 
 ```shell
-terraform import unionai_app_access.example app-access-id
+terraform import unionai_application_access.example app-access-id
 ```

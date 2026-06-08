@@ -1,23 +1,23 @@
 ---
-page_title: "unionai_app_access Data Source - terraform-provider-unionai"
+page_title: "unionai_application_access Data Source - terraform-provider-unionai"
 subcategory: ""
 description: |-
   Retrieves information about a Union.ai application access assignment.
 ---
 
-# unionai_app_access (Data Source)
+# unionai_application_access (Data Source)
 
 Retrieves information about a Union.ai application access assignment.
 
 ## Example Usage
 
 ```terraform
-data "unionai_app_access" "example" {
+data "unionai_application_access" "example" {
   id = "app-access-id"
 }
 
 output "assigned_app" {
-  value = data.unionai_app_access.example.app_id
+  value = data.unionai_application_access.example.app_id
 }
 ```
 
