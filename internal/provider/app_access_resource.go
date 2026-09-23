@@ -24,8 +24,9 @@ func NewAppAccessResource() resource.Resource {
 
 // AppAccessResource defines the resource implementation.
 type AppAccessResource struct {
-	conn authorizer.AuthorizerServiceClient
-	org  string
+	conn        authorizer.AuthorizerServiceClient
+	org         string
+	assignments *identityAssignmentCache
 }
 
 // AppAccessResourceModel describes the resource data model.
@@ -80,6 +81,7 @@ func (r *AppAccessResource) Configure(ctx context.Context, req resource.Configur
 
 	r.conn = authorizer.NewAuthorizerServiceClient(client.conn)
 	r.org = client.org
+	r.assignments = client.assignments
 }
 
 func (r *AppAccessResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -94,13 +96,7 @@ func (r *AppAccessResource) Create(ctx context.Context, req resource.CreateReque
 
 	_, err := r.conn.AssignIdentity(ctx, &authorizer.AssignIdentityRequest{
 		Organization: r.org,
-		Identity: &common.Identity{
-			Principal: &common.Identity_ApplicationId{
-				ApplicationId: &common.ApplicationIdentifier{
-					Subject: data.App.ValueString(),
-				},
-			},
-		},
+		Identity:     appIdentity(data.App.ValueString()),
 		Assignment: &authorizer.AssignIdentityRequest_PolicyId{
 			PolicyId: &common.PolicyIdentifier{
 				Name:         data.Policy.ValueString(),
@@ -108,6 +104,7 @@ func (r *AppAccessResource) Create(ctx context.Context, req resource.CreateReque
 			},
 		},
 	})
+	r.assignments.invalidate(r.org, appIdentity(data.App.ValueString()))
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Creating Application Access",
@@ -130,15 +127,9 @@ func (r *AppAccessResource) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 
-	result, err := r.conn.GetIdentityAssignments(ctx, &authorizer.GetIdentityAssignmentRequest{
+	result, err := r.assignments.get(ctx, r.conn, &authorizer.GetIdentityAssignmentRequest{
 		Organization: r.org,
-		Identity: &common.Identity{
-			Principal: &common.Identity_ApplicationId{
-				ApplicationId: &common.ApplicationIdentifier{
-					Subject: data.App.ValueString(),
-				},
-			},
-		},
+		Identity:     appIdentity(data.App.ValueString()),
 	})
 	if err != nil {
 		if status.Code(err) == codes.NotFound {
@@ -153,14 +144,7 @@ func (r *AppAccessResource) Read(ctx context.Context, req resource.ReadRequest, 
 	}
 
 	// Verify the specific policy assignment still exists
-	var assigned bool
-	for _, p := range result.IdentityAssignment.Policies {
-		if p.Id.Name == data.Policy.ValueString() && p.Id.Organization == r.org {
-			assigned = true
-			break
-		}
-	}
-	if !assigned {
+	if !hasPolicy(result, r.org, data.Policy.ValueString()) {
 		resp.State.RemoveResource(ctx)
 		return
 	}
@@ -195,13 +179,7 @@ func (r *AppAccessResource) Delete(ctx context.Context, req resource.DeleteReque
 
 	_, err := r.conn.UnassignIdentity(ctx, &authorizer.UnassignIdentityRequest{
 		Organization: r.org,
-		Identity: &common.Identity{
-			Principal: &common.Identity_ApplicationId{
-				ApplicationId: &common.ApplicationIdentifier{
-					Subject: data.App.ValueString(),
-				},
-			},
-		},
+		Identity:     appIdentity(data.App.ValueString()),
 		Assignment: &authorizer.UnassignIdentityRequest_PolicyId{
 			PolicyId: &common.PolicyIdentifier{
 				Name:         data.Policy.ValueString(),
@@ -209,11 +187,22 @@ func (r *AppAccessResource) Delete(ctx context.Context, req resource.DeleteReque
 			},
 		},
 	})
+	r.assignments.invalidate(r.org, appIdentity(data.App.ValueString()))
 	if err != nil {
 		if status.Code(err) == codes.NotFound {
 			return
 		}
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete application access, got error: %s", err))
 		return
+	}
+}
+
+func appIdentity(subject string) *common.Identity {
+	return &common.Identity{
+		Principal: &common.Identity_ApplicationId{
+			ApplicationId: &common.ApplicationIdentifier{
+				Subject: subject,
+			},
+		},
 	}
 }

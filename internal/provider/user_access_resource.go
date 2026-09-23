@@ -26,8 +26,9 @@ func NewUserAccessResource() resource.Resource {
 
 // UserAccessResource defines the resource implementation.
 type UserAccessResource struct {
-	conn authorizer.AuthorizerServiceClient
-	org  string
+	conn        authorizer.AuthorizerServiceClient
+	org         string
+	assignments *identityAssignmentCache
 }
 
 // UserAccessResourceModel describes the resource data model.
@@ -89,6 +90,7 @@ func (r *UserAccessResource) Configure(ctx context.Context, req resource.Configu
 		return
 	}
 	r.org = client.org
+	r.assignments = client.assignments
 }
 
 func (r *UserAccessResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -103,13 +105,7 @@ func (r *UserAccessResource) Create(ctx context.Context, req resource.CreateRequ
 
 	_, err := r.conn.AssignIdentity(ctx, &authorizer.AssignIdentityRequest{
 		Organization: r.org,
-		Identity: &common.Identity{
-			Principal: &common.Identity_UserId{
-				UserId: &common.UserIdentifier{
-					Subject: data.User.ValueString(),
-				},
-			},
-		},
+		Identity:     userIdentity(data.User.ValueString()),
 		Assignment: &authorizer.AssignIdentityRequest_PolicyId{
 			PolicyId: &common.PolicyIdentifier{
 				Name:         data.Policy.ValueString(),
@@ -117,6 +113,7 @@ func (r *UserAccessResource) Create(ctx context.Context, req resource.CreateRequ
 			},
 		},
 	})
+	r.assignments.invalidate(r.org, userIdentity(data.User.ValueString()))
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Creating User Access",
@@ -139,15 +136,9 @@ func (r *UserAccessResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
-	_, err := r.conn.GetIdentityAssignments(ctx, &authorizer.GetIdentityAssignmentRequest{
+	result, err := r.assignments.get(ctx, r.conn, &authorizer.GetIdentityAssignmentRequest{
 		Organization: r.org,
-		Identity: &common.Identity{
-			Principal: &common.Identity_UserId{
-				UserId: &common.UserIdentifier{
-					Subject: data.User.ValueString(),
-				},
-			},
-		},
+		Identity:     userIdentity(data.User.ValueString()),
 	})
 	if err != nil {
 		// Catch gRPC error if the assignment is not found
@@ -159,6 +150,12 @@ func (r *UserAccessResource) Read(ctx context.Context, req resource.ReadRequest,
 			"Error Reading User Access",
 			fmt.Sprintf("Error reading user access for user %s: %s", data.User.ValueString(), err),
 		)
+		return
+	}
+
+	// Verify the specific policy assignment still exists
+	if !hasPolicy(result, r.org, data.Policy.ValueString()) {
+		resp.State.RemoveResource(ctx)
 		return
 	}
 
@@ -192,13 +189,7 @@ func (r *UserAccessResource) Delete(ctx context.Context, req resource.DeleteRequ
 
 	_, err := r.conn.UnassignIdentity(ctx, &authorizer.UnassignIdentityRequest{
 		Organization: r.org,
-		Identity: &common.Identity{
-			Principal: &common.Identity_UserId{
-				UserId: &common.UserIdentifier{
-					Subject: data.User.ValueString(),
-				},
-			},
-		},
+		Identity:     userIdentity(data.User.ValueString()),
 		Assignment: &authorizer.UnassignIdentityRequest_PolicyId{
 			PolicyId: &common.PolicyIdentifier{
 				Name:         data.Policy.ValueString(),
@@ -206,6 +197,7 @@ func (r *UserAccessResource) Delete(ctx context.Context, req resource.DeleteRequ
 			},
 		},
 	})
+	r.assignments.invalidate(r.org, userIdentity(data.User.ValueString()))
 	if err != nil {
 		if status.Code(err) == codes.NotFound {
 			resp.State.RemoveResource(ctx)
@@ -218,4 +210,14 @@ func (r *UserAccessResource) Delete(ctx context.Context, req resource.DeleteRequ
 
 func (r *UserAccessResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+}
+
+func userIdentity(subject string) *common.Identity {
+	return &common.Identity{
+		Principal: &common.Identity_UserId{
+			UserId: &common.UserIdentifier{
+				Subject: subject,
+			},
+		},
+	}
 }

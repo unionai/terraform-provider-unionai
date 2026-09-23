@@ -30,9 +30,10 @@ type UnionaiProviderModel struct {
 }
 
 type providerContext struct {
-	conn *grpc.ClientConn
-	org  string
-	host string
+	conn        *grpc.ClientConn
+	org         string
+	host        string
+	assignments *identityAssignmentCache
 }
 
 func (p *UnionaiProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -103,9 +104,10 @@ func (p *UnionaiProvider) Configure(ctx context.Context, req provider.ConfigureR
 	}
 
 	client := &providerContext{
-		conn: conn,
-		org:  apiTokenConfig.Org,
-		host: apiTokenConfig.Host,
+		conn:        conn,
+		org:         apiTokenConfig.Org,
+		host:        apiTokenConfig.Host,
+		assignments: newIdentityAssignmentCache(),
 	}
 	resp.DataSourceData = client
 	resp.ResourceData = client
