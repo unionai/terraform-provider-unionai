@@ -19,13 +19,21 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	ClusterService_Heartbeat_FullMethodName     = "/cloudidl.cluster.ClusterService/Heartbeat"
-	ClusterService_CreateTunnel_FullMethodName  = "/cloudidl.cluster.ClusterService/CreateTunnel"
-	ClusterService_UpdateStatus_FullMethodName  = "/cloudidl.cluster.ClusterService/UpdateStatus"
-	ClusterService_GetCluster_FullMethodName    = "/cloudidl.cluster.ClusterService/GetCluster"
-	ClusterService_DeleteCluster_FullMethodName = "/cloudidl.cluster.ClusterService/DeleteCluster"
-	ClusterService_ListClusters_FullMethodName  = "/cloudidl.cluster.ClusterService/ListClusters"
-	ClusterService_Count_FullMethodName         = "/cloudidl.cluster.ClusterService/Count"
+	ClusterService_Heartbeat_FullMethodName          = "/cloudidl.cluster.ClusterService/Heartbeat"
+	ClusterService_CreateCluster_FullMethodName      = "/cloudidl.cluster.ClusterService/CreateCluster"
+	ClusterService_UpdateCluster_FullMethodName      = "/cloudidl.cluster.ClusterService/UpdateCluster"
+	ClusterService_UpdateClusterState_FullMethodName = "/cloudidl.cluster.ClusterService/UpdateClusterState"
+	ClusterService_CreateTunnel_FullMethodName       = "/cloudidl.cluster.ClusterService/CreateTunnel"
+	ClusterService_UpdateStatus_FullMethodName       = "/cloudidl.cluster.ClusterService/UpdateStatus"
+	ClusterService_GetCluster_FullMethodName         = "/cloudidl.cluster.ClusterService/GetCluster"
+	ClusterService_DeleteCluster_FullMethodName      = "/cloudidl.cluster.ClusterService/DeleteCluster"
+	ClusterService_UndeleteCluster_FullMethodName    = "/cloudidl.cluster.ClusterService/UndeleteCluster"
+	ClusterService_ListClusters_FullMethodName       = "/cloudidl.cluster.ClusterService/ListClusters"
+	ClusterService_Count_FullMethodName              = "/cloudidl.cluster.ClusterService/Count"
+	ClusterService_WatchClusters_FullMethodName      = "/cloudidl.cluster.ClusterService/WatchClusters"
+	ClusterService_WatchClusterHealth_FullMethodName = "/cloudidl.cluster.ClusterService/WatchClusterHealth"
+	ClusterService_GetClusterSnapshot_FullMethodName = "/cloudidl.cluster.ClusterService/GetClusterSnapshot"
+	ClusterService_WatchClusterUsage_FullMethodName  = "/cloudidl.cluster.ClusterService/WatchClusterUsage"
 )
 
 // ClusterServiceClient is the client API for ClusterService service.
@@ -33,12 +41,153 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ClusterServiceClient interface {
 	Heartbeat(ctx context.Context, in *HeartbeatRequest, opts ...grpc.CallOption) (*HeartbeatRequestResponse, error)
+	// Create a cluster and, implicitly, the queue that routes to it: a queue with the same
+	// name, in the same pool, routing to this cluster and nothing else. That queue's routing
+	// and pool are managed by the cluster from then on and cannot be changed through
+	// QueueService.UpdateQueue.
+	// A cluster therefore owns its name in the queue namespace: the request is rejected when a
+	// queue of that name already exists, and CreateQueue is likewise rejected when a cluster
+	// owns the name. The reserved name "default" cannot be used for a cluster at all.
+	CreateCluster(ctx context.Context, in *CreateClusterRequest, opts ...grpc.CallOption) (*CreateClusterResponse, error)
+	// Move a cluster to a different cluster pool. That is the only thing this RPC changes:
+	// everything else about a cluster is either fixed at creation or reported by its dataplane
+	// through UpdateStatus.
+	// The cluster must exist and not be soft-deleted, and cluster_pool_name must name a pool
+	// other than the one it is already in — re-assigning a cluster to its current pool is
+	// rejected as already existing.
+	// The target pool must already exist and be live: a move never creates a pool, the reserved
+	// "default" pool included, and a soft-deleted one is rejected until it is undeleted.
+	// The cluster's co-named implicit queue moves along with it, so the move carries the same
+	// precondition that repointing a queue at another pool does: that queue must be DRAINED
+	// first, otherwise the request is rejected. Any other live queue that explicitly references
+	// the cluster blocks the move and must be unpinned first; a soft-deleted one does not block
+	// it, and has the cluster dropped from its routing instead — it cannot follow the cluster
+	// into the new pool, and keeping a reference it could no longer resolve would leave it
+	// impossible to undelete.
+	// The cluster and its queue change pool in the same transaction: either both move or
+	// neither does.
+	UpdateCluster(ctx context.Context, in *UpdateClusterRequest, opts ...grpc.CallOption) (*UpdateClusterResponse, error)
+	// Drain or activate a cluster. Only ACTIVE and DRAINING can be requested.
+	// DRAINED is only set by the system, when leasor reports no run or finalize
+	// leases are left on the cluster. Deleting goes through DeleteCluster, and a
+	// DELETING or DELETED cluster cannot be drained or activated.
+	//
+	// Draining is rejected while:
+	//   - another live queue pins the cluster in its spec.clusters — unpin it
+	//     first (wildcard queues don't block; the cluster just drops out of
+	//     their available_clusters);
+	//   - an app is assigned to the cluster — apps have no drain step, so stop
+	//     or reassign them first.
+	//
+	// Draining a cluster also drains its co-named queue, and activating it
+	// activates that queue again; leasor confirms the drained queue and the
+	// drained cluster separately. The queue cannot be activated on its own
+	// while its cluster is draining or drained.
+	// A DRAINING cluster gets no new work but keeps running what it already
+	// has. It can be reactivated at any time; that resets drain progress.
+	UpdateClusterState(ctx context.Context, in *UpdateClusterStateRequest, opts ...grpc.CallOption) (*UpdateClusterStateResponse, error)
 	CreateTunnel(ctx context.Context, in *CreateTunnelRequest, opts ...grpc.CallOption) (*CreateTunnelResponse, error)
 	UpdateStatus(ctx context.Context, in *UpdateStatusRequest, opts ...grpc.CallOption) (*UpdateStatusResponse, error)
+	// Get a cluster by name. A soft-deleted (DELETED) cluster yields NotFound
+	// unless the request sets include_deleted, which returns the tombstone so
+	// the record stays inspectable after deletion. ListClusters hides deleted
+	// clusters unless the request filters on deleted_at.
 	GetCluster(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*GetResponse, error)
+	// Delete a cluster. What it does depends on the state (see ClusterState):
+	//   - DRAINED: leasor has already confirmed the cluster holds no leases, so
+	//     it is soft-deleted right away and comes back DELETED. Workers it may
+	//     still have connected are cut off by leasor once the cluster drops out
+	//     of ListClusters;
+	//   - ACTIVE or DRAINING: it comes back DELETING, and the system moves it to
+	//     DELETED once leasor reports it has cleaned up everything it held for
+	//     the cluster.
+	//
+	// DELETED is a soft delete: the record is kept with deleted_at set and the
+	// name stays reserved (GetCluster serves it under include_deleted), but the
+	// cluster disappears from GetCluster and ListClusters by default, is no
+	// longer routed to, and stops accepting heartbeats and status updates. Deletion cannot be cancelled; a DELETED cluster can be
+	// brought back with UndeleteCluster. Deleting a DELETING or DELETED cluster is
+	// rejected, as is a request with a stale expected_generation.
+	// The cluster's co-named queue is deleted with it, by the same rule applied
+	// to the queue's own state: DRAINED goes straight to DELETED, ACTIVE or
+	// DRAINING goes to DELETING (only this cascade may take an ACTIVE queue into
+	// DELETING — the DeleteQueue RPC rejects an ACTIVE queue; drain it first).
+	// Leasor confirms the queue's deletion separately, through
+	// the queue's own report; the cluster's report never flips the queue, and
+	// the two complete in either order.
+	// Any other live queue that pins the cluster blocks the delete — unpin it
+	// first. A soft-deleted pinning queue does not block it and keeps its
+	// reference (unlike a pool move, which drops it), so it can only be
+	// undeleted once the cluster is.
+	// Apps assigned to the cluster are ignored: deletion neither evicts nor
+	// reassigns them, so any app pods still on the dataplane are the caller's
+	// to clean up like the rest of its pods. (Draining is stricter — it refuses
+	// while apps are assigned. Deletion may start evicting apps in the future.)
+	// The cluster's nodepool inventory is dropped when the cluster reaches
+	// DELETED — immediately for a DRAINED cluster, on leasor's report otherwise
+	// — and is not restored by UndeleteCluster.
 	DeleteCluster(ctx context.Context, in *DeleteRequest, opts ...grpc.CallOption) (*DeleteResponse, error)
+	// Undelete a soft-deleted cluster, restoring the spec, status and pool
+	// assignment it had when it was deleted. It always comes back DRAINED,
+	// whatever state its deletion started from, and must be activated with
+	// UpdateClusterState before it takes work again. A DELETING cluster cannot
+	// be undeleted; its deletion has to finish first.
+	// Its co-named queue, if tombstoned, is restored with it, also DRAINED —
+	// even if that queue was deleted on its own before the cluster was. This is
+	// the only way to bring that queue back: UndeleteQueue refuses it while the
+	// cluster is deleted. A co-named queue still in DELETING (its own teardown
+	// unconfirmed) is not touched — it finishes deleting on leasor's report.
+	// The cluster's pool must not itself be soft-deleted: undelete the pool first.
+	// Undeleting a cluster that is not deleted is rejected.
+	UndeleteCluster(ctx context.Context, in *UndeleteRequest, opts ...grpc.CallOption) (*UndeleteResponse, error)
+	// List clusters within an organization.
+	// Soft-deleted clusters are excluded unless the request filters on the deleted_at field:
+	// function EXISTS lists only soft-deleted clusters (the only clusters that carry
+	// Cluster.deleted_at), function NOT_EXISTS is the default of live clusters only.
+	// This is how a client discovers a deleted cluster to pass to UndeleteCluster.
+	// A DELETING cluster is still live and always listed: leasor relies on this
+	// to see it and finish its deletion.
 	ListClusters(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*ListResponse, error)
 	Count(ctx context.Context, in *CountRequest, opts ...grpc.CallOption) (*CountResponse, error)
+	// WatchClusters streams the cluster list for the Cluster List page and the
+	// Queue -> Clusters tab: one ClusterSummary per cluster, carrying everything
+	// a list row renders (control-plane lifecycle, tunnel and queues alongside
+	// the reported health, resources and versions), so a client needs no
+	// ListClusters call beside it. The full in-scope set is re-sent whenever it
+	// changes (~heartbeat cadence). gRPC / Connect streaming only (no
+	// HTTP/gateway binding), matching WatchQueueMetrics.
+	WatchClusters(ctx context.Context, in *WatchClustersRequest, opts ...grpc.CallOption) (ClusterService_WatchClustersClient, error)
+	// WatchClusterHealth streams the full health snapshot for a single cluster —
+	// the cluster detail pages (Overview / Components / Details tabs). The snapshot
+	// is re-sent whenever the cluster's state changes (~heartbeat cadence). gRPC /
+	// Connect streaming only (no HTTP/gateway binding), matching WatchClusters.
+	WatchClusterHealth(ctx context.Context, in *WatchClusterHealthRequest, opts ...grpc.CallOption) (ClusterService_WatchClusterHealthClient, error)
+	// GetClusterSnapshot returns the latest snapshot the cluster's operator
+	// reported (ClusterStatusService.ReportClusterSnapshot), in full: every section
+	// of ClusterSnapshot, not only the ones the detail pages render. Unary, so the
+	// CLI, the SDK and plain HTTP clients can read it; WatchClusterHealth is the
+	// live channel for the detail pages.
+	//
+	// The health rollup (snapshot.detail.health) is the control plane's verdict,
+	// not the operator's last word: it accounts for a cluster that has stopped
+	// reporting, and for a required dependency (propeller, proxy, storage) whose
+	// check keeps failing, which makes the cluster UNHEALTHY however the operator
+	// rolled it up. Everything else is returned as the operator sent it, and a
+	// section the operator did not report is left unset.
+	//
+	// A cluster whose operator does not push snapshots yet is served from its
+	// UpdateStatus heartbeat, which fills the sections the heartbeat carries. A
+	// cluster that has never reported returns WAITING health and no observed_at.
+	// NotFound is reserved for a cluster that does not exist (or is soft-deleted).
+	GetClusterSnapshot(ctx context.Context, in *GetClusterSnapshotRequest, opts ...grpc.CallOption) (*GetClusterSnapshotResponse, error)
+	// WatchClusterUsage streams leasor's view of what is running on each
+	// cluster: the demand it has scheduled for dispatch there and not yet seen finish
+	// (ClusterUsage). This is the cluster-side counterpart of
+	// QueueService.WatchQueueMetrics and is served the same way: the cluster
+	// service checks the clusters exist, then relays leasor's stream. A
+	// snapshot is sent immediately and then on a fixed tick. gRPC / Connect
+	// streaming only (no HTTP/gateway binding), matching WatchClusters.
+	WatchClusterUsage(ctx context.Context, in *WatchClusterUsageRequest, opts ...grpc.CallOption) (ClusterService_WatchClusterUsageClient, error)
 }
 
 type clusterServiceClient struct {
@@ -52,6 +201,33 @@ func NewClusterServiceClient(cc grpc.ClientConnInterface) ClusterServiceClient {
 func (c *clusterServiceClient) Heartbeat(ctx context.Context, in *HeartbeatRequest, opts ...grpc.CallOption) (*HeartbeatRequestResponse, error) {
 	out := new(HeartbeatRequestResponse)
 	err := c.cc.Invoke(ctx, ClusterService_Heartbeat_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *clusterServiceClient) CreateCluster(ctx context.Context, in *CreateClusterRequest, opts ...grpc.CallOption) (*CreateClusterResponse, error) {
+	out := new(CreateClusterResponse)
+	err := c.cc.Invoke(ctx, ClusterService_CreateCluster_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *clusterServiceClient) UpdateCluster(ctx context.Context, in *UpdateClusterRequest, opts ...grpc.CallOption) (*UpdateClusterResponse, error) {
+	out := new(UpdateClusterResponse)
+	err := c.cc.Invoke(ctx, ClusterService_UpdateCluster_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *clusterServiceClient) UpdateClusterState(ctx context.Context, in *UpdateClusterStateRequest, opts ...grpc.CallOption) (*UpdateClusterStateResponse, error) {
+	out := new(UpdateClusterStateResponse)
+	err := c.cc.Invoke(ctx, ClusterService_UpdateClusterState_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -94,6 +270,15 @@ func (c *clusterServiceClient) DeleteCluster(ctx context.Context, in *DeleteRequ
 	return out, nil
 }
 
+func (c *clusterServiceClient) UndeleteCluster(ctx context.Context, in *UndeleteRequest, opts ...grpc.CallOption) (*UndeleteResponse, error) {
+	out := new(UndeleteResponse)
+	err := c.cc.Invoke(ctx, ClusterService_UndeleteCluster_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *clusterServiceClient) ListClusters(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*ListResponse, error) {
 	out := new(ListResponse)
 	err := c.cc.Invoke(ctx, ClusterService_ListClusters_FullMethodName, in, out, opts...)
@@ -112,17 +297,263 @@ func (c *clusterServiceClient) Count(ctx context.Context, in *CountRequest, opts
 	return out, nil
 }
 
+func (c *clusterServiceClient) WatchClusters(ctx context.Context, in *WatchClustersRequest, opts ...grpc.CallOption) (ClusterService_WatchClustersClient, error) {
+	stream, err := c.cc.NewStream(ctx, &ClusterService_ServiceDesc.Streams[0], ClusterService_WatchClusters_FullMethodName, opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &clusterServiceWatchClustersClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type ClusterService_WatchClustersClient interface {
+	Recv() (*WatchClustersResponse, error)
+	grpc.ClientStream
+}
+
+type clusterServiceWatchClustersClient struct {
+	grpc.ClientStream
+}
+
+func (x *clusterServiceWatchClustersClient) Recv() (*WatchClustersResponse, error) {
+	m := new(WatchClustersResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func (c *clusterServiceClient) WatchClusterHealth(ctx context.Context, in *WatchClusterHealthRequest, opts ...grpc.CallOption) (ClusterService_WatchClusterHealthClient, error) {
+	stream, err := c.cc.NewStream(ctx, &ClusterService_ServiceDesc.Streams[1], ClusterService_WatchClusterHealth_FullMethodName, opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &clusterServiceWatchClusterHealthClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type ClusterService_WatchClusterHealthClient interface {
+	Recv() (*WatchClusterHealthResponse, error)
+	grpc.ClientStream
+}
+
+type clusterServiceWatchClusterHealthClient struct {
+	grpc.ClientStream
+}
+
+func (x *clusterServiceWatchClusterHealthClient) Recv() (*WatchClusterHealthResponse, error) {
+	m := new(WatchClusterHealthResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func (c *clusterServiceClient) GetClusterSnapshot(ctx context.Context, in *GetClusterSnapshotRequest, opts ...grpc.CallOption) (*GetClusterSnapshotResponse, error) {
+	out := new(GetClusterSnapshotResponse)
+	err := c.cc.Invoke(ctx, ClusterService_GetClusterSnapshot_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *clusterServiceClient) WatchClusterUsage(ctx context.Context, in *WatchClusterUsageRequest, opts ...grpc.CallOption) (ClusterService_WatchClusterUsageClient, error) {
+	stream, err := c.cc.NewStream(ctx, &ClusterService_ServiceDesc.Streams[2], ClusterService_WatchClusterUsage_FullMethodName, opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &clusterServiceWatchClusterUsageClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type ClusterService_WatchClusterUsageClient interface {
+	Recv() (*WatchClusterUsageResponse, error)
+	grpc.ClientStream
+}
+
+type clusterServiceWatchClusterUsageClient struct {
+	grpc.ClientStream
+}
+
+func (x *clusterServiceWatchClusterUsageClient) Recv() (*WatchClusterUsageResponse, error) {
+	m := new(WatchClusterUsageResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // ClusterServiceServer is the server API for ClusterService service.
 // All implementations should embed UnimplementedClusterServiceServer
 // for forward compatibility
 type ClusterServiceServer interface {
 	Heartbeat(context.Context, *HeartbeatRequest) (*HeartbeatRequestResponse, error)
+	// Create a cluster and, implicitly, the queue that routes to it: a queue with the same
+	// name, in the same pool, routing to this cluster and nothing else. That queue's routing
+	// and pool are managed by the cluster from then on and cannot be changed through
+	// QueueService.UpdateQueue.
+	// A cluster therefore owns its name in the queue namespace: the request is rejected when a
+	// queue of that name already exists, and CreateQueue is likewise rejected when a cluster
+	// owns the name. The reserved name "default" cannot be used for a cluster at all.
+	CreateCluster(context.Context, *CreateClusterRequest) (*CreateClusterResponse, error)
+	// Move a cluster to a different cluster pool. That is the only thing this RPC changes:
+	// everything else about a cluster is either fixed at creation or reported by its dataplane
+	// through UpdateStatus.
+	// The cluster must exist and not be soft-deleted, and cluster_pool_name must name a pool
+	// other than the one it is already in — re-assigning a cluster to its current pool is
+	// rejected as already existing.
+	// The target pool must already exist and be live: a move never creates a pool, the reserved
+	// "default" pool included, and a soft-deleted one is rejected until it is undeleted.
+	// The cluster's co-named implicit queue moves along with it, so the move carries the same
+	// precondition that repointing a queue at another pool does: that queue must be DRAINED
+	// first, otherwise the request is rejected. Any other live queue that explicitly references
+	// the cluster blocks the move and must be unpinned first; a soft-deleted one does not block
+	// it, and has the cluster dropped from its routing instead — it cannot follow the cluster
+	// into the new pool, and keeping a reference it could no longer resolve would leave it
+	// impossible to undelete.
+	// The cluster and its queue change pool in the same transaction: either both move or
+	// neither does.
+	UpdateCluster(context.Context, *UpdateClusterRequest) (*UpdateClusterResponse, error)
+	// Drain or activate a cluster. Only ACTIVE and DRAINING can be requested.
+	// DRAINED is only set by the system, when leasor reports no run or finalize
+	// leases are left on the cluster. Deleting goes through DeleteCluster, and a
+	// DELETING or DELETED cluster cannot be drained or activated.
+	//
+	// Draining is rejected while:
+	//   - another live queue pins the cluster in its spec.clusters — unpin it
+	//     first (wildcard queues don't block; the cluster just drops out of
+	//     their available_clusters);
+	//   - an app is assigned to the cluster — apps have no drain step, so stop
+	//     or reassign them first.
+	//
+	// Draining a cluster also drains its co-named queue, and activating it
+	// activates that queue again; leasor confirms the drained queue and the
+	// drained cluster separately. The queue cannot be activated on its own
+	// while its cluster is draining or drained.
+	// A DRAINING cluster gets no new work but keeps running what it already
+	// has. It can be reactivated at any time; that resets drain progress.
+	UpdateClusterState(context.Context, *UpdateClusterStateRequest) (*UpdateClusterStateResponse, error)
 	CreateTunnel(context.Context, *CreateTunnelRequest) (*CreateTunnelResponse, error)
 	UpdateStatus(context.Context, *UpdateStatusRequest) (*UpdateStatusResponse, error)
+	// Get a cluster by name. A soft-deleted (DELETED) cluster yields NotFound
+	// unless the request sets include_deleted, which returns the tombstone so
+	// the record stays inspectable after deletion. ListClusters hides deleted
+	// clusters unless the request filters on deleted_at.
 	GetCluster(context.Context, *GetRequest) (*GetResponse, error)
+	// Delete a cluster. What it does depends on the state (see ClusterState):
+	//   - DRAINED: leasor has already confirmed the cluster holds no leases, so
+	//     it is soft-deleted right away and comes back DELETED. Workers it may
+	//     still have connected are cut off by leasor once the cluster drops out
+	//     of ListClusters;
+	//   - ACTIVE or DRAINING: it comes back DELETING, and the system moves it to
+	//     DELETED once leasor reports it has cleaned up everything it held for
+	//     the cluster.
+	//
+	// DELETED is a soft delete: the record is kept with deleted_at set and the
+	// name stays reserved (GetCluster serves it under include_deleted), but the
+	// cluster disappears from GetCluster and ListClusters by default, is no
+	// longer routed to, and stops accepting heartbeats and status updates. Deletion cannot be cancelled; a DELETED cluster can be
+	// brought back with UndeleteCluster. Deleting a DELETING or DELETED cluster is
+	// rejected, as is a request with a stale expected_generation.
+	// The cluster's co-named queue is deleted with it, by the same rule applied
+	// to the queue's own state: DRAINED goes straight to DELETED, ACTIVE or
+	// DRAINING goes to DELETING (only this cascade may take an ACTIVE queue into
+	// DELETING — the DeleteQueue RPC rejects an ACTIVE queue; drain it first).
+	// Leasor confirms the queue's deletion separately, through
+	// the queue's own report; the cluster's report never flips the queue, and
+	// the two complete in either order.
+	// Any other live queue that pins the cluster blocks the delete — unpin it
+	// first. A soft-deleted pinning queue does not block it and keeps its
+	// reference (unlike a pool move, which drops it), so it can only be
+	// undeleted once the cluster is.
+	// Apps assigned to the cluster are ignored: deletion neither evicts nor
+	// reassigns them, so any app pods still on the dataplane are the caller's
+	// to clean up like the rest of its pods. (Draining is stricter — it refuses
+	// while apps are assigned. Deletion may start evicting apps in the future.)
+	// The cluster's nodepool inventory is dropped when the cluster reaches
+	// DELETED — immediately for a DRAINED cluster, on leasor's report otherwise
+	// — and is not restored by UndeleteCluster.
 	DeleteCluster(context.Context, *DeleteRequest) (*DeleteResponse, error)
+	// Undelete a soft-deleted cluster, restoring the spec, status and pool
+	// assignment it had when it was deleted. It always comes back DRAINED,
+	// whatever state its deletion started from, and must be activated with
+	// UpdateClusterState before it takes work again. A DELETING cluster cannot
+	// be undeleted; its deletion has to finish first.
+	// Its co-named queue, if tombstoned, is restored with it, also DRAINED —
+	// even if that queue was deleted on its own before the cluster was. This is
+	// the only way to bring that queue back: UndeleteQueue refuses it while the
+	// cluster is deleted. A co-named queue still in DELETING (its own teardown
+	// unconfirmed) is not touched — it finishes deleting on leasor's report.
+	// The cluster's pool must not itself be soft-deleted: undelete the pool first.
+	// Undeleting a cluster that is not deleted is rejected.
+	UndeleteCluster(context.Context, *UndeleteRequest) (*UndeleteResponse, error)
+	// List clusters within an organization.
+	// Soft-deleted clusters are excluded unless the request filters on the deleted_at field:
+	// function EXISTS lists only soft-deleted clusters (the only clusters that carry
+	// Cluster.deleted_at), function NOT_EXISTS is the default of live clusters only.
+	// This is how a client discovers a deleted cluster to pass to UndeleteCluster.
+	// A DELETING cluster is still live and always listed: leasor relies on this
+	// to see it and finish its deletion.
 	ListClusters(context.Context, *ListRequest) (*ListResponse, error)
 	Count(context.Context, *CountRequest) (*CountResponse, error)
+	// WatchClusters streams the cluster list for the Cluster List page and the
+	// Queue -> Clusters tab: one ClusterSummary per cluster, carrying everything
+	// a list row renders (control-plane lifecycle, tunnel and queues alongside
+	// the reported health, resources and versions), so a client needs no
+	// ListClusters call beside it. The full in-scope set is re-sent whenever it
+	// changes (~heartbeat cadence). gRPC / Connect streaming only (no
+	// HTTP/gateway binding), matching WatchQueueMetrics.
+	WatchClusters(*WatchClustersRequest, ClusterService_WatchClustersServer) error
+	// WatchClusterHealth streams the full health snapshot for a single cluster —
+	// the cluster detail pages (Overview / Components / Details tabs). The snapshot
+	// is re-sent whenever the cluster's state changes (~heartbeat cadence). gRPC /
+	// Connect streaming only (no HTTP/gateway binding), matching WatchClusters.
+	WatchClusterHealth(*WatchClusterHealthRequest, ClusterService_WatchClusterHealthServer) error
+	// GetClusterSnapshot returns the latest snapshot the cluster's operator
+	// reported (ClusterStatusService.ReportClusterSnapshot), in full: every section
+	// of ClusterSnapshot, not only the ones the detail pages render. Unary, so the
+	// CLI, the SDK and plain HTTP clients can read it; WatchClusterHealth is the
+	// live channel for the detail pages.
+	//
+	// The health rollup (snapshot.detail.health) is the control plane's verdict,
+	// not the operator's last word: it accounts for a cluster that has stopped
+	// reporting, and for a required dependency (propeller, proxy, storage) whose
+	// check keeps failing, which makes the cluster UNHEALTHY however the operator
+	// rolled it up. Everything else is returned as the operator sent it, and a
+	// section the operator did not report is left unset.
+	//
+	// A cluster whose operator does not push snapshots yet is served from its
+	// UpdateStatus heartbeat, which fills the sections the heartbeat carries. A
+	// cluster that has never reported returns WAITING health and no observed_at.
+	// NotFound is reserved for a cluster that does not exist (or is soft-deleted).
+	GetClusterSnapshot(context.Context, *GetClusterSnapshotRequest) (*GetClusterSnapshotResponse, error)
+	// WatchClusterUsage streams leasor's view of what is running on each
+	// cluster: the demand it has scheduled for dispatch there and not yet seen finish
+	// (ClusterUsage). This is the cluster-side counterpart of
+	// QueueService.WatchQueueMetrics and is served the same way: the cluster
+	// service checks the clusters exist, then relays leasor's stream. A
+	// snapshot is sent immediately and then on a fixed tick. gRPC / Connect
+	// streaming only (no HTTP/gateway binding), matching WatchClusters.
+	WatchClusterUsage(*WatchClusterUsageRequest, ClusterService_WatchClusterUsageServer) error
 }
 
 // UnimplementedClusterServiceServer should be embedded to have forward compatible implementations.
@@ -131,6 +562,15 @@ type UnimplementedClusterServiceServer struct {
 
 func (UnimplementedClusterServiceServer) Heartbeat(context.Context, *HeartbeatRequest) (*HeartbeatRequestResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Heartbeat not implemented")
+}
+func (UnimplementedClusterServiceServer) CreateCluster(context.Context, *CreateClusterRequest) (*CreateClusterResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateCluster not implemented")
+}
+func (UnimplementedClusterServiceServer) UpdateCluster(context.Context, *UpdateClusterRequest) (*UpdateClusterResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateCluster not implemented")
+}
+func (UnimplementedClusterServiceServer) UpdateClusterState(context.Context, *UpdateClusterStateRequest) (*UpdateClusterStateResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateClusterState not implemented")
 }
 func (UnimplementedClusterServiceServer) CreateTunnel(context.Context, *CreateTunnelRequest) (*CreateTunnelResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateTunnel not implemented")
@@ -144,11 +584,26 @@ func (UnimplementedClusterServiceServer) GetCluster(context.Context, *GetRequest
 func (UnimplementedClusterServiceServer) DeleteCluster(context.Context, *DeleteRequest) (*DeleteResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteCluster not implemented")
 }
+func (UnimplementedClusterServiceServer) UndeleteCluster(context.Context, *UndeleteRequest) (*UndeleteResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UndeleteCluster not implemented")
+}
 func (UnimplementedClusterServiceServer) ListClusters(context.Context, *ListRequest) (*ListResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListClusters not implemented")
 }
 func (UnimplementedClusterServiceServer) Count(context.Context, *CountRequest) (*CountResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Count not implemented")
+}
+func (UnimplementedClusterServiceServer) WatchClusters(*WatchClustersRequest, ClusterService_WatchClustersServer) error {
+	return status.Errorf(codes.Unimplemented, "method WatchClusters not implemented")
+}
+func (UnimplementedClusterServiceServer) WatchClusterHealth(*WatchClusterHealthRequest, ClusterService_WatchClusterHealthServer) error {
+	return status.Errorf(codes.Unimplemented, "method WatchClusterHealth not implemented")
+}
+func (UnimplementedClusterServiceServer) GetClusterSnapshot(context.Context, *GetClusterSnapshotRequest) (*GetClusterSnapshotResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetClusterSnapshot not implemented")
+}
+func (UnimplementedClusterServiceServer) WatchClusterUsage(*WatchClusterUsageRequest, ClusterService_WatchClusterUsageServer) error {
+	return status.Errorf(codes.Unimplemented, "method WatchClusterUsage not implemented")
 }
 
 // UnsafeClusterServiceServer may be embedded to opt out of forward compatibility for this service.
@@ -176,6 +631,60 @@ func _ClusterService_Heartbeat_Handler(srv interface{}, ctx context.Context, dec
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ClusterServiceServer).Heartbeat(ctx, req.(*HeartbeatRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ClusterService_CreateCluster_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateClusterRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ClusterServiceServer).CreateCluster(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ClusterService_CreateCluster_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ClusterServiceServer).CreateCluster(ctx, req.(*CreateClusterRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ClusterService_UpdateCluster_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateClusterRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ClusterServiceServer).UpdateCluster(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ClusterService_UpdateCluster_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ClusterServiceServer).UpdateCluster(ctx, req.(*UpdateClusterRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ClusterService_UpdateClusterState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateClusterStateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ClusterServiceServer).UpdateClusterState(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ClusterService_UpdateClusterState_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ClusterServiceServer).UpdateClusterState(ctx, req.(*UpdateClusterStateRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -252,6 +761,24 @@ func _ClusterService_DeleteCluster_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ClusterService_UndeleteCluster_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UndeleteRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ClusterServiceServer).UndeleteCluster(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ClusterService_UndeleteCluster_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ClusterServiceServer).UndeleteCluster(ctx, req.(*UndeleteRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ClusterService_ListClusters_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListRequest)
 	if err := dec(in); err != nil {
@@ -288,6 +815,87 @@ func _ClusterService_Count_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ClusterService_WatchClusters_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(WatchClustersRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(ClusterServiceServer).WatchClusters(m, &clusterServiceWatchClustersServer{stream})
+}
+
+type ClusterService_WatchClustersServer interface {
+	Send(*WatchClustersResponse) error
+	grpc.ServerStream
+}
+
+type clusterServiceWatchClustersServer struct {
+	grpc.ServerStream
+}
+
+func (x *clusterServiceWatchClustersServer) Send(m *WatchClustersResponse) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func _ClusterService_WatchClusterHealth_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(WatchClusterHealthRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(ClusterServiceServer).WatchClusterHealth(m, &clusterServiceWatchClusterHealthServer{stream})
+}
+
+type ClusterService_WatchClusterHealthServer interface {
+	Send(*WatchClusterHealthResponse) error
+	grpc.ServerStream
+}
+
+type clusterServiceWatchClusterHealthServer struct {
+	grpc.ServerStream
+}
+
+func (x *clusterServiceWatchClusterHealthServer) Send(m *WatchClusterHealthResponse) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func _ClusterService_GetClusterSnapshot_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetClusterSnapshotRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ClusterServiceServer).GetClusterSnapshot(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ClusterService_GetClusterSnapshot_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ClusterServiceServer).GetClusterSnapshot(ctx, req.(*GetClusterSnapshotRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ClusterService_WatchClusterUsage_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(WatchClusterUsageRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(ClusterServiceServer).WatchClusterUsage(m, &clusterServiceWatchClusterUsageServer{stream})
+}
+
+type ClusterService_WatchClusterUsageServer interface {
+	Send(*WatchClusterUsageResponse) error
+	grpc.ServerStream
+}
+
+type clusterServiceWatchClusterUsageServer struct {
+	grpc.ServerStream
+}
+
+func (x *clusterServiceWatchClusterUsageServer) Send(m *WatchClusterUsageResponse) error {
+	return x.ServerStream.SendMsg(m)
+}
+
 // ClusterService_ServiceDesc is the grpc.ServiceDesc for ClusterService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -298,6 +906,18 @@ var ClusterService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Heartbeat",
 			Handler:    _ClusterService_Heartbeat_Handler,
+		},
+		{
+			MethodName: "CreateCluster",
+			Handler:    _ClusterService_CreateCluster_Handler,
+		},
+		{
+			MethodName: "UpdateCluster",
+			Handler:    _ClusterService_UpdateCluster_Handler,
+		},
+		{
+			MethodName: "UpdateClusterState",
+			Handler:    _ClusterService_UpdateClusterState_Handler,
 		},
 		{
 			MethodName: "CreateTunnel",
@@ -316,6 +936,10 @@ var ClusterService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _ClusterService_DeleteCluster_Handler,
 		},
 		{
+			MethodName: "UndeleteCluster",
+			Handler:    _ClusterService_UndeleteCluster_Handler,
+		},
+		{
 			MethodName: "ListClusters",
 			Handler:    _ClusterService_ListClusters_Handler,
 		},
@@ -323,7 +947,27 @@ var ClusterService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "Count",
 			Handler:    _ClusterService_Count_Handler,
 		},
+		{
+			MethodName: "GetClusterSnapshot",
+			Handler:    _ClusterService_GetClusterSnapshot_Handler,
+		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "WatchClusters",
+			Handler:       _ClusterService_WatchClusters_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "WatchClusterHealth",
+			Handler:       _ClusterService_WatchClusterHealth_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "WatchClusterUsage",
+			Handler:       _ClusterService_WatchClusterUsage_Handler,
+			ServerStreams: true,
+		},
+	},
 	Metadata: "cluster/cluster.proto",
 }

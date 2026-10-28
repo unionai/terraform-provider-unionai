@@ -144,6 +144,7 @@ func (p *UnionaiProvider) Resources(ctx context.Context) []func() resource.Resou
 		NewTaskEnvironmentResource,
 		NewProjectDomainAttributesResource,
 		NewQueueResource,
+		NewNodeGroupsResource,
 	}
 }
 
@@ -161,6 +162,7 @@ func (p *UnionaiProvider) DataSources(ctx context.Context) []func() datasource.D
 		NewDataplanesDataSource,
 		NewControlplaneDataSource,
 		NewQueueDataSource,
+		NewNodeGroupsDataSource,
 	}
 }
 

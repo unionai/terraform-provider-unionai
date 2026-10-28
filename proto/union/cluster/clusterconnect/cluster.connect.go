@@ -36,6 +36,15 @@ const (
 	// ClusterServiceHeartbeatProcedure is the fully-qualified name of the ClusterService's Heartbeat
 	// RPC.
 	ClusterServiceHeartbeatProcedure = "/cloudidl.cluster.ClusterService/Heartbeat"
+	// ClusterServiceCreateClusterProcedure is the fully-qualified name of the ClusterService's
+	// CreateCluster RPC.
+	ClusterServiceCreateClusterProcedure = "/cloudidl.cluster.ClusterService/CreateCluster"
+	// ClusterServiceUpdateClusterProcedure is the fully-qualified name of the ClusterService's
+	// UpdateCluster RPC.
+	ClusterServiceUpdateClusterProcedure = "/cloudidl.cluster.ClusterService/UpdateCluster"
+	// ClusterServiceUpdateClusterStateProcedure is the fully-qualified name of the ClusterService's
+	// UpdateClusterState RPC.
+	ClusterServiceUpdateClusterStateProcedure = "/cloudidl.cluster.ClusterService/UpdateClusterState"
 	// ClusterServiceCreateTunnelProcedure is the fully-qualified name of the ClusterService's
 	// CreateTunnel RPC.
 	ClusterServiceCreateTunnelProcedure = "/cloudidl.cluster.ClusterService/CreateTunnel"
@@ -48,34 +57,198 @@ const (
 	// ClusterServiceDeleteClusterProcedure is the fully-qualified name of the ClusterService's
 	// DeleteCluster RPC.
 	ClusterServiceDeleteClusterProcedure = "/cloudidl.cluster.ClusterService/DeleteCluster"
+	// ClusterServiceUndeleteClusterProcedure is the fully-qualified name of the ClusterService's
+	// UndeleteCluster RPC.
+	ClusterServiceUndeleteClusterProcedure = "/cloudidl.cluster.ClusterService/UndeleteCluster"
 	// ClusterServiceListClustersProcedure is the fully-qualified name of the ClusterService's
 	// ListClusters RPC.
 	ClusterServiceListClustersProcedure = "/cloudidl.cluster.ClusterService/ListClusters"
 	// ClusterServiceCountProcedure is the fully-qualified name of the ClusterService's Count RPC.
 	ClusterServiceCountProcedure = "/cloudidl.cluster.ClusterService/Count"
+	// ClusterServiceWatchClustersProcedure is the fully-qualified name of the ClusterService's
+	// WatchClusters RPC.
+	ClusterServiceWatchClustersProcedure = "/cloudidl.cluster.ClusterService/WatchClusters"
+	// ClusterServiceWatchClusterHealthProcedure is the fully-qualified name of the ClusterService's
+	// WatchClusterHealth RPC.
+	ClusterServiceWatchClusterHealthProcedure = "/cloudidl.cluster.ClusterService/WatchClusterHealth"
+	// ClusterServiceGetClusterSnapshotProcedure is the fully-qualified name of the ClusterService's
+	// GetClusterSnapshot RPC.
+	ClusterServiceGetClusterSnapshotProcedure = "/cloudidl.cluster.ClusterService/GetClusterSnapshot"
+	// ClusterServiceWatchClusterUsageProcedure is the fully-qualified name of the ClusterService's
+	// WatchClusterUsage RPC.
+	ClusterServiceWatchClusterUsageProcedure = "/cloudidl.cluster.ClusterService/WatchClusterUsage"
 )
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
 var (
-	clusterServiceServiceDescriptor             = cluster.File_cluster_cluster_proto.Services().ByName("ClusterService")
-	clusterServiceHeartbeatMethodDescriptor     = clusterServiceServiceDescriptor.Methods().ByName("Heartbeat")
-	clusterServiceCreateTunnelMethodDescriptor  = clusterServiceServiceDescriptor.Methods().ByName("CreateTunnel")
-	clusterServiceUpdateStatusMethodDescriptor  = clusterServiceServiceDescriptor.Methods().ByName("UpdateStatus")
-	clusterServiceGetClusterMethodDescriptor    = clusterServiceServiceDescriptor.Methods().ByName("GetCluster")
-	clusterServiceDeleteClusterMethodDescriptor = clusterServiceServiceDescriptor.Methods().ByName("DeleteCluster")
-	clusterServiceListClustersMethodDescriptor  = clusterServiceServiceDescriptor.Methods().ByName("ListClusters")
-	clusterServiceCountMethodDescriptor         = clusterServiceServiceDescriptor.Methods().ByName("Count")
+	clusterServiceServiceDescriptor                  = cluster.File_cluster_cluster_proto.Services().ByName("ClusterService")
+	clusterServiceHeartbeatMethodDescriptor          = clusterServiceServiceDescriptor.Methods().ByName("Heartbeat")
+	clusterServiceCreateClusterMethodDescriptor      = clusterServiceServiceDescriptor.Methods().ByName("CreateCluster")
+	clusterServiceUpdateClusterMethodDescriptor      = clusterServiceServiceDescriptor.Methods().ByName("UpdateCluster")
+	clusterServiceUpdateClusterStateMethodDescriptor = clusterServiceServiceDescriptor.Methods().ByName("UpdateClusterState")
+	clusterServiceCreateTunnelMethodDescriptor       = clusterServiceServiceDescriptor.Methods().ByName("CreateTunnel")
+	clusterServiceUpdateStatusMethodDescriptor       = clusterServiceServiceDescriptor.Methods().ByName("UpdateStatus")
+	clusterServiceGetClusterMethodDescriptor         = clusterServiceServiceDescriptor.Methods().ByName("GetCluster")
+	clusterServiceDeleteClusterMethodDescriptor      = clusterServiceServiceDescriptor.Methods().ByName("DeleteCluster")
+	clusterServiceUndeleteClusterMethodDescriptor    = clusterServiceServiceDescriptor.Methods().ByName("UndeleteCluster")
+	clusterServiceListClustersMethodDescriptor       = clusterServiceServiceDescriptor.Methods().ByName("ListClusters")
+	clusterServiceCountMethodDescriptor              = clusterServiceServiceDescriptor.Methods().ByName("Count")
+	clusterServiceWatchClustersMethodDescriptor      = clusterServiceServiceDescriptor.Methods().ByName("WatchClusters")
+	clusterServiceWatchClusterHealthMethodDescriptor = clusterServiceServiceDescriptor.Methods().ByName("WatchClusterHealth")
+	clusterServiceGetClusterSnapshotMethodDescriptor = clusterServiceServiceDescriptor.Methods().ByName("GetClusterSnapshot")
+	clusterServiceWatchClusterUsageMethodDescriptor  = clusterServiceServiceDescriptor.Methods().ByName("WatchClusterUsage")
 )
 
 // ClusterServiceClient is a client for the cloudidl.cluster.ClusterService service.
 type ClusterServiceClient interface {
 	Heartbeat(context.Context, *connect.Request[cluster.HeartbeatRequest]) (*connect.Response[cluster.HeartbeatRequestResponse], error)
+	// Create a cluster and, implicitly, the queue that routes to it: a queue with the same
+	// name, in the same pool, routing to this cluster and nothing else. That queue's routing
+	// and pool are managed by the cluster from then on and cannot be changed through
+	// QueueService.UpdateQueue.
+	// A cluster therefore owns its name in the queue namespace: the request is rejected when a
+	// queue of that name already exists, and CreateQueue is likewise rejected when a cluster
+	// owns the name. The reserved name "default" cannot be used for a cluster at all.
+	CreateCluster(context.Context, *connect.Request[cluster.CreateClusterRequest]) (*connect.Response[cluster.CreateClusterResponse], error)
+	// Move a cluster to a different cluster pool. That is the only thing this RPC changes:
+	// everything else about a cluster is either fixed at creation or reported by its dataplane
+	// through UpdateStatus.
+	// The cluster must exist and not be soft-deleted, and cluster_pool_name must name a pool
+	// other than the one it is already in — re-assigning a cluster to its current pool is
+	// rejected as already existing.
+	// The target pool must already exist and be live: a move never creates a pool, the reserved
+	// "default" pool included, and a soft-deleted one is rejected until it is undeleted.
+	// The cluster's co-named implicit queue moves along with it, so the move carries the same
+	// precondition that repointing a queue at another pool does: that queue must be DRAINED
+	// first, otherwise the request is rejected. Any other live queue that explicitly references
+	// the cluster blocks the move and must be unpinned first; a soft-deleted one does not block
+	// it, and has the cluster dropped from its routing instead — it cannot follow the cluster
+	// into the new pool, and keeping a reference it could no longer resolve would leave it
+	// impossible to undelete.
+	// The cluster and its queue change pool in the same transaction: either both move or
+	// neither does.
+	UpdateCluster(context.Context, *connect.Request[cluster.UpdateClusterRequest]) (*connect.Response[cluster.UpdateClusterResponse], error)
+	// Drain or activate a cluster. Only ACTIVE and DRAINING can be requested.
+	// DRAINED is only set by the system, when leasor reports no run or finalize
+	// leases are left on the cluster. Deleting goes through DeleteCluster, and a
+	// DELETING or DELETED cluster cannot be drained or activated.
+	//
+	// Draining is rejected while:
+	//   - another live queue pins the cluster in its spec.clusters — unpin it
+	//     first (wildcard queues don't block; the cluster just drops out of
+	//     their available_clusters);
+	//   - an app is assigned to the cluster — apps have no drain step, so stop
+	//     or reassign them first.
+	//
+	// Draining a cluster also drains its co-named queue, and activating it
+	// activates that queue again; leasor confirms the drained queue and the
+	// drained cluster separately. The queue cannot be activated on its own
+	// while its cluster is draining or drained.
+	// A DRAINING cluster gets no new work but keeps running what it already
+	// has. It can be reactivated at any time; that resets drain progress.
+	UpdateClusterState(context.Context, *connect.Request[cluster.UpdateClusterStateRequest]) (*connect.Response[cluster.UpdateClusterStateResponse], error)
 	CreateTunnel(context.Context, *connect.Request[cluster.CreateTunnelRequest]) (*connect.Response[cluster.CreateTunnelResponse], error)
 	UpdateStatus(context.Context, *connect.Request[cluster.UpdateStatusRequest]) (*connect.Response[cluster.UpdateStatusResponse], error)
+	// Get a cluster by name. A soft-deleted (DELETED) cluster yields NotFound
+	// unless the request sets include_deleted, which returns the tombstone so
+	// the record stays inspectable after deletion. ListClusters hides deleted
+	// clusters unless the request filters on deleted_at.
 	GetCluster(context.Context, *connect.Request[cluster.GetRequest]) (*connect.Response[cluster.GetResponse], error)
+	// Delete a cluster. What it does depends on the state (see ClusterState):
+	//   - DRAINED: leasor has already confirmed the cluster holds no leases, so
+	//     it is soft-deleted right away and comes back DELETED. Workers it may
+	//     still have connected are cut off by leasor once the cluster drops out
+	//     of ListClusters;
+	//   - ACTIVE or DRAINING: it comes back DELETING, and the system moves it to
+	//     DELETED once leasor reports it has cleaned up everything it held for
+	//     the cluster.
+	//
+	// DELETED is a soft delete: the record is kept with deleted_at set and the
+	// name stays reserved (GetCluster serves it under include_deleted), but the
+	// cluster disappears from GetCluster and ListClusters by default, is no
+	// longer routed to, and stops accepting heartbeats and status updates. Deletion cannot be cancelled; a DELETED cluster can be
+	// brought back with UndeleteCluster. Deleting a DELETING or DELETED cluster is
+	// rejected, as is a request with a stale expected_generation.
+	// The cluster's co-named queue is deleted with it, by the same rule applied
+	// to the queue's own state: DRAINED goes straight to DELETED, ACTIVE or
+	// DRAINING goes to DELETING (only this cascade may take an ACTIVE queue into
+	// DELETING — the DeleteQueue RPC rejects an ACTIVE queue; drain it first).
+	// Leasor confirms the queue's deletion separately, through
+	// the queue's own report; the cluster's report never flips the queue, and
+	// the two complete in either order.
+	// Any other live queue that pins the cluster blocks the delete — unpin it
+	// first. A soft-deleted pinning queue does not block it and keeps its
+	// reference (unlike a pool move, which drops it), so it can only be
+	// undeleted once the cluster is.
+	// Apps assigned to the cluster are ignored: deletion neither evicts nor
+	// reassigns them, so any app pods still on the dataplane are the caller's
+	// to clean up like the rest of its pods. (Draining is stricter — it refuses
+	// while apps are assigned. Deletion may start evicting apps in the future.)
+	// The cluster's nodepool inventory is dropped when the cluster reaches
+	// DELETED — immediately for a DRAINED cluster, on leasor's report otherwise
+	// — and is not restored by UndeleteCluster.
 	DeleteCluster(context.Context, *connect.Request[cluster.DeleteRequest]) (*connect.Response[cluster.DeleteResponse], error)
+	// Undelete a soft-deleted cluster, restoring the spec, status and pool
+	// assignment it had when it was deleted. It always comes back DRAINED,
+	// whatever state its deletion started from, and must be activated with
+	// UpdateClusterState before it takes work again. A DELETING cluster cannot
+	// be undeleted; its deletion has to finish first.
+	// Its co-named queue, if tombstoned, is restored with it, also DRAINED —
+	// even if that queue was deleted on its own before the cluster was. This is
+	// the only way to bring that queue back: UndeleteQueue refuses it while the
+	// cluster is deleted. A co-named queue still in DELETING (its own teardown
+	// unconfirmed) is not touched — it finishes deleting on leasor's report.
+	// The cluster's pool must not itself be soft-deleted: undelete the pool first.
+	// Undeleting a cluster that is not deleted is rejected.
+	UndeleteCluster(context.Context, *connect.Request[cluster.UndeleteRequest]) (*connect.Response[cluster.UndeleteResponse], error)
+	// List clusters within an organization.
+	// Soft-deleted clusters are excluded unless the request filters on the deleted_at field:
+	// function EXISTS lists only soft-deleted clusters (the only clusters that carry
+	// Cluster.deleted_at), function NOT_EXISTS is the default of live clusters only.
+	// This is how a client discovers a deleted cluster to pass to UndeleteCluster.
+	// A DELETING cluster is still live and always listed: leasor relies on this
+	// to see it and finish its deletion.
 	ListClusters(context.Context, *connect.Request[cluster.ListRequest]) (*connect.Response[cluster.ListResponse], error)
 	Count(context.Context, *connect.Request[cluster.CountRequest]) (*connect.Response[cluster.CountResponse], error)
+	// WatchClusters streams the cluster list for the Cluster List page and the
+	// Queue -> Clusters tab: one ClusterSummary per cluster, carrying everything
+	// a list row renders (control-plane lifecycle, tunnel and queues alongside
+	// the reported health, resources and versions), so a client needs no
+	// ListClusters call beside it. The full in-scope set is re-sent whenever it
+	// changes (~heartbeat cadence). gRPC / Connect streaming only (no
+	// HTTP/gateway binding), matching WatchQueueMetrics.
+	WatchClusters(context.Context, *connect.Request[cluster.WatchClustersRequest]) (*connect.ServerStreamForClient[cluster.WatchClustersResponse], error)
+	// WatchClusterHealth streams the full health snapshot for a single cluster —
+	// the cluster detail pages (Overview / Components / Details tabs). The snapshot
+	// is re-sent whenever the cluster's state changes (~heartbeat cadence). gRPC /
+	// Connect streaming only (no HTTP/gateway binding), matching WatchClusters.
+	WatchClusterHealth(context.Context, *connect.Request[cluster.WatchClusterHealthRequest]) (*connect.ServerStreamForClient[cluster.WatchClusterHealthResponse], error)
+	// GetClusterSnapshot returns the latest snapshot the cluster's operator
+	// reported (ClusterStatusService.ReportClusterSnapshot), in full: every section
+	// of ClusterSnapshot, not only the ones the detail pages render. Unary, so the
+	// CLI, the SDK and plain HTTP clients can read it; WatchClusterHealth is the
+	// live channel for the detail pages.
+	//
+	// The health rollup (snapshot.detail.health) is the control plane's verdict,
+	// not the operator's last word: it accounts for a cluster that has stopped
+	// reporting, and for a required dependency (propeller, proxy, storage) whose
+	// check keeps failing, which makes the cluster UNHEALTHY however the operator
+	// rolled it up. Everything else is returned as the operator sent it, and a
+	// section the operator did not report is left unset.
+	//
+	// A cluster whose operator does not push snapshots yet is served from its
+	// UpdateStatus heartbeat, which fills the sections the heartbeat carries. A
+	// cluster that has never reported returns WAITING health and no observed_at.
+	// NotFound is reserved for a cluster that does not exist (or is soft-deleted).
+	GetClusterSnapshot(context.Context, *connect.Request[cluster.GetClusterSnapshotRequest]) (*connect.Response[cluster.GetClusterSnapshotResponse], error)
+	// WatchClusterUsage streams leasor's view of what is running on each
+	// cluster: the demand it has scheduled for dispatch there and not yet seen finish
+	// (ClusterUsage). This is the cluster-side counterpart of
+	// QueueService.WatchQueueMetrics and is served the same way: the cluster
+	// service checks the clusters exist, then relays leasor's stream. A
+	// snapshot is sent immediately and then on a fixed tick. gRPC / Connect
+	// streaming only (no HTTP/gateway binding), matching WatchClusters.
+	WatchClusterUsage(context.Context, *connect.Request[cluster.WatchClusterUsageRequest]) (*connect.ServerStreamForClient[cluster.WatchClusterUsageResponse], error)
 }
 
 // NewClusterServiceClient constructs a client for the cloudidl.cluster.ClusterService service. By
@@ -92,6 +265,24 @@ func NewClusterServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			httpClient,
 			baseURL+ClusterServiceHeartbeatProcedure,
 			connect.WithSchema(clusterServiceHeartbeatMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		createCluster: connect.NewClient[cluster.CreateClusterRequest, cluster.CreateClusterResponse](
+			httpClient,
+			baseURL+ClusterServiceCreateClusterProcedure,
+			connect.WithSchema(clusterServiceCreateClusterMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		updateCluster: connect.NewClient[cluster.UpdateClusterRequest, cluster.UpdateClusterResponse](
+			httpClient,
+			baseURL+ClusterServiceUpdateClusterProcedure,
+			connect.WithSchema(clusterServiceUpdateClusterMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		updateClusterState: connect.NewClient[cluster.UpdateClusterStateRequest, cluster.UpdateClusterStateResponse](
+			httpClient,
+			baseURL+ClusterServiceUpdateClusterStateProcedure,
+			connect.WithSchema(clusterServiceUpdateClusterStateMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 		createTunnel: connect.NewClient[cluster.CreateTunnelRequest, cluster.CreateTunnelResponse](
@@ -118,6 +309,12 @@ func NewClusterServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(clusterServiceDeleteClusterMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		undeleteCluster: connect.NewClient[cluster.UndeleteRequest, cluster.UndeleteResponse](
+			httpClient,
+			baseURL+ClusterServiceUndeleteClusterProcedure,
+			connect.WithSchema(clusterServiceUndeleteClusterMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 		listClusters: connect.NewClient[cluster.ListRequest, cluster.ListResponse](
 			httpClient,
 			baseURL+ClusterServiceListClustersProcedure,
@@ -130,23 +327,74 @@ func NewClusterServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(clusterServiceCountMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		watchClusters: connect.NewClient[cluster.WatchClustersRequest, cluster.WatchClustersResponse](
+			httpClient,
+			baseURL+ClusterServiceWatchClustersProcedure,
+			connect.WithSchema(clusterServiceWatchClustersMethodDescriptor),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		watchClusterHealth: connect.NewClient[cluster.WatchClusterHealthRequest, cluster.WatchClusterHealthResponse](
+			httpClient,
+			baseURL+ClusterServiceWatchClusterHealthProcedure,
+			connect.WithSchema(clusterServiceWatchClusterHealthMethodDescriptor),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		getClusterSnapshot: connect.NewClient[cluster.GetClusterSnapshotRequest, cluster.GetClusterSnapshotResponse](
+			httpClient,
+			baseURL+ClusterServiceGetClusterSnapshotProcedure,
+			connect.WithSchema(clusterServiceGetClusterSnapshotMethodDescriptor),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		watchClusterUsage: connect.NewClient[cluster.WatchClusterUsageRequest, cluster.WatchClusterUsageResponse](
+			httpClient,
+			baseURL+ClusterServiceWatchClusterUsageProcedure,
+			connect.WithSchema(clusterServiceWatchClusterUsageMethodDescriptor),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // clusterServiceClient implements ClusterServiceClient.
 type clusterServiceClient struct {
-	heartbeat     *connect.Client[cluster.HeartbeatRequest, cluster.HeartbeatRequestResponse]
-	createTunnel  *connect.Client[cluster.CreateTunnelRequest, cluster.CreateTunnelResponse]
-	updateStatus  *connect.Client[cluster.UpdateStatusRequest, cluster.UpdateStatusResponse]
-	getCluster    *connect.Client[cluster.GetRequest, cluster.GetResponse]
-	deleteCluster *connect.Client[cluster.DeleteRequest, cluster.DeleteResponse]
-	listClusters  *connect.Client[cluster.ListRequest, cluster.ListResponse]
-	count         *connect.Client[cluster.CountRequest, cluster.CountResponse]
+	heartbeat          *connect.Client[cluster.HeartbeatRequest, cluster.HeartbeatRequestResponse]
+	createCluster      *connect.Client[cluster.CreateClusterRequest, cluster.CreateClusterResponse]
+	updateCluster      *connect.Client[cluster.UpdateClusterRequest, cluster.UpdateClusterResponse]
+	updateClusterState *connect.Client[cluster.UpdateClusterStateRequest, cluster.UpdateClusterStateResponse]
+	createTunnel       *connect.Client[cluster.CreateTunnelRequest, cluster.CreateTunnelResponse]
+	updateStatus       *connect.Client[cluster.UpdateStatusRequest, cluster.UpdateStatusResponse]
+	getCluster         *connect.Client[cluster.GetRequest, cluster.GetResponse]
+	deleteCluster      *connect.Client[cluster.DeleteRequest, cluster.DeleteResponse]
+	undeleteCluster    *connect.Client[cluster.UndeleteRequest, cluster.UndeleteResponse]
+	listClusters       *connect.Client[cluster.ListRequest, cluster.ListResponse]
+	count              *connect.Client[cluster.CountRequest, cluster.CountResponse]
+	watchClusters      *connect.Client[cluster.WatchClustersRequest, cluster.WatchClustersResponse]
+	watchClusterHealth *connect.Client[cluster.WatchClusterHealthRequest, cluster.WatchClusterHealthResponse]
+	getClusterSnapshot *connect.Client[cluster.GetClusterSnapshotRequest, cluster.GetClusterSnapshotResponse]
+	watchClusterUsage  *connect.Client[cluster.WatchClusterUsageRequest, cluster.WatchClusterUsageResponse]
 }
 
 // Heartbeat calls cloudidl.cluster.ClusterService.Heartbeat.
 func (c *clusterServiceClient) Heartbeat(ctx context.Context, req *connect.Request[cluster.HeartbeatRequest]) (*connect.Response[cluster.HeartbeatRequestResponse], error) {
 	return c.heartbeat.CallUnary(ctx, req)
+}
+
+// CreateCluster calls cloudidl.cluster.ClusterService.CreateCluster.
+func (c *clusterServiceClient) CreateCluster(ctx context.Context, req *connect.Request[cluster.CreateClusterRequest]) (*connect.Response[cluster.CreateClusterResponse], error) {
+	return c.createCluster.CallUnary(ctx, req)
+}
+
+// UpdateCluster calls cloudidl.cluster.ClusterService.UpdateCluster.
+func (c *clusterServiceClient) UpdateCluster(ctx context.Context, req *connect.Request[cluster.UpdateClusterRequest]) (*connect.Response[cluster.UpdateClusterResponse], error) {
+	return c.updateCluster.CallUnary(ctx, req)
+}
+
+// UpdateClusterState calls cloudidl.cluster.ClusterService.UpdateClusterState.
+func (c *clusterServiceClient) UpdateClusterState(ctx context.Context, req *connect.Request[cluster.UpdateClusterStateRequest]) (*connect.Response[cluster.UpdateClusterStateResponse], error) {
+	return c.updateClusterState.CallUnary(ctx, req)
 }
 
 // CreateTunnel calls cloudidl.cluster.ClusterService.CreateTunnel.
@@ -169,6 +417,11 @@ func (c *clusterServiceClient) DeleteCluster(ctx context.Context, req *connect.R
 	return c.deleteCluster.CallUnary(ctx, req)
 }
 
+// UndeleteCluster calls cloudidl.cluster.ClusterService.UndeleteCluster.
+func (c *clusterServiceClient) UndeleteCluster(ctx context.Context, req *connect.Request[cluster.UndeleteRequest]) (*connect.Response[cluster.UndeleteResponse], error) {
+	return c.undeleteCluster.CallUnary(ctx, req)
+}
+
 // ListClusters calls cloudidl.cluster.ClusterService.ListClusters.
 func (c *clusterServiceClient) ListClusters(ctx context.Context, req *connect.Request[cluster.ListRequest]) (*connect.Response[cluster.ListResponse], error) {
 	return c.listClusters.CallUnary(ctx, req)
@@ -179,15 +432,176 @@ func (c *clusterServiceClient) Count(ctx context.Context, req *connect.Request[c
 	return c.count.CallUnary(ctx, req)
 }
 
+// WatchClusters calls cloudidl.cluster.ClusterService.WatchClusters.
+func (c *clusterServiceClient) WatchClusters(ctx context.Context, req *connect.Request[cluster.WatchClustersRequest]) (*connect.ServerStreamForClient[cluster.WatchClustersResponse], error) {
+	return c.watchClusters.CallServerStream(ctx, req)
+}
+
+// WatchClusterHealth calls cloudidl.cluster.ClusterService.WatchClusterHealth.
+func (c *clusterServiceClient) WatchClusterHealth(ctx context.Context, req *connect.Request[cluster.WatchClusterHealthRequest]) (*connect.ServerStreamForClient[cluster.WatchClusterHealthResponse], error) {
+	return c.watchClusterHealth.CallServerStream(ctx, req)
+}
+
+// GetClusterSnapshot calls cloudidl.cluster.ClusterService.GetClusterSnapshot.
+func (c *clusterServiceClient) GetClusterSnapshot(ctx context.Context, req *connect.Request[cluster.GetClusterSnapshotRequest]) (*connect.Response[cluster.GetClusterSnapshotResponse], error) {
+	return c.getClusterSnapshot.CallUnary(ctx, req)
+}
+
+// WatchClusterUsage calls cloudidl.cluster.ClusterService.WatchClusterUsage.
+func (c *clusterServiceClient) WatchClusterUsage(ctx context.Context, req *connect.Request[cluster.WatchClusterUsageRequest]) (*connect.ServerStreamForClient[cluster.WatchClusterUsageResponse], error) {
+	return c.watchClusterUsage.CallServerStream(ctx, req)
+}
+
 // ClusterServiceHandler is an implementation of the cloudidl.cluster.ClusterService service.
 type ClusterServiceHandler interface {
 	Heartbeat(context.Context, *connect.Request[cluster.HeartbeatRequest]) (*connect.Response[cluster.HeartbeatRequestResponse], error)
+	// Create a cluster and, implicitly, the queue that routes to it: a queue with the same
+	// name, in the same pool, routing to this cluster and nothing else. That queue's routing
+	// and pool are managed by the cluster from then on and cannot be changed through
+	// QueueService.UpdateQueue.
+	// A cluster therefore owns its name in the queue namespace: the request is rejected when a
+	// queue of that name already exists, and CreateQueue is likewise rejected when a cluster
+	// owns the name. The reserved name "default" cannot be used for a cluster at all.
+	CreateCluster(context.Context, *connect.Request[cluster.CreateClusterRequest]) (*connect.Response[cluster.CreateClusterResponse], error)
+	// Move a cluster to a different cluster pool. That is the only thing this RPC changes:
+	// everything else about a cluster is either fixed at creation or reported by its dataplane
+	// through UpdateStatus.
+	// The cluster must exist and not be soft-deleted, and cluster_pool_name must name a pool
+	// other than the one it is already in — re-assigning a cluster to its current pool is
+	// rejected as already existing.
+	// The target pool must already exist and be live: a move never creates a pool, the reserved
+	// "default" pool included, and a soft-deleted one is rejected until it is undeleted.
+	// The cluster's co-named implicit queue moves along with it, so the move carries the same
+	// precondition that repointing a queue at another pool does: that queue must be DRAINED
+	// first, otherwise the request is rejected. Any other live queue that explicitly references
+	// the cluster blocks the move and must be unpinned first; a soft-deleted one does not block
+	// it, and has the cluster dropped from its routing instead — it cannot follow the cluster
+	// into the new pool, and keeping a reference it could no longer resolve would leave it
+	// impossible to undelete.
+	// The cluster and its queue change pool in the same transaction: either both move or
+	// neither does.
+	UpdateCluster(context.Context, *connect.Request[cluster.UpdateClusterRequest]) (*connect.Response[cluster.UpdateClusterResponse], error)
+	// Drain or activate a cluster. Only ACTIVE and DRAINING can be requested.
+	// DRAINED is only set by the system, when leasor reports no run or finalize
+	// leases are left on the cluster. Deleting goes through DeleteCluster, and a
+	// DELETING or DELETED cluster cannot be drained or activated.
+	//
+	// Draining is rejected while:
+	//   - another live queue pins the cluster in its spec.clusters — unpin it
+	//     first (wildcard queues don't block; the cluster just drops out of
+	//     their available_clusters);
+	//   - an app is assigned to the cluster — apps have no drain step, so stop
+	//     or reassign them first.
+	//
+	// Draining a cluster also drains its co-named queue, and activating it
+	// activates that queue again; leasor confirms the drained queue and the
+	// drained cluster separately. The queue cannot be activated on its own
+	// while its cluster is draining or drained.
+	// A DRAINING cluster gets no new work but keeps running what it already
+	// has. It can be reactivated at any time; that resets drain progress.
+	UpdateClusterState(context.Context, *connect.Request[cluster.UpdateClusterStateRequest]) (*connect.Response[cluster.UpdateClusterStateResponse], error)
 	CreateTunnel(context.Context, *connect.Request[cluster.CreateTunnelRequest]) (*connect.Response[cluster.CreateTunnelResponse], error)
 	UpdateStatus(context.Context, *connect.Request[cluster.UpdateStatusRequest]) (*connect.Response[cluster.UpdateStatusResponse], error)
+	// Get a cluster by name. A soft-deleted (DELETED) cluster yields NotFound
+	// unless the request sets include_deleted, which returns the tombstone so
+	// the record stays inspectable after deletion. ListClusters hides deleted
+	// clusters unless the request filters on deleted_at.
 	GetCluster(context.Context, *connect.Request[cluster.GetRequest]) (*connect.Response[cluster.GetResponse], error)
+	// Delete a cluster. What it does depends on the state (see ClusterState):
+	//   - DRAINED: leasor has already confirmed the cluster holds no leases, so
+	//     it is soft-deleted right away and comes back DELETED. Workers it may
+	//     still have connected are cut off by leasor once the cluster drops out
+	//     of ListClusters;
+	//   - ACTIVE or DRAINING: it comes back DELETING, and the system moves it to
+	//     DELETED once leasor reports it has cleaned up everything it held for
+	//     the cluster.
+	//
+	// DELETED is a soft delete: the record is kept with deleted_at set and the
+	// name stays reserved (GetCluster serves it under include_deleted), but the
+	// cluster disappears from GetCluster and ListClusters by default, is no
+	// longer routed to, and stops accepting heartbeats and status updates. Deletion cannot be cancelled; a DELETED cluster can be
+	// brought back with UndeleteCluster. Deleting a DELETING or DELETED cluster is
+	// rejected, as is a request with a stale expected_generation.
+	// The cluster's co-named queue is deleted with it, by the same rule applied
+	// to the queue's own state: DRAINED goes straight to DELETED, ACTIVE or
+	// DRAINING goes to DELETING (only this cascade may take an ACTIVE queue into
+	// DELETING — the DeleteQueue RPC rejects an ACTIVE queue; drain it first).
+	// Leasor confirms the queue's deletion separately, through
+	// the queue's own report; the cluster's report never flips the queue, and
+	// the two complete in either order.
+	// Any other live queue that pins the cluster blocks the delete — unpin it
+	// first. A soft-deleted pinning queue does not block it and keeps its
+	// reference (unlike a pool move, which drops it), so it can only be
+	// undeleted once the cluster is.
+	// Apps assigned to the cluster are ignored: deletion neither evicts nor
+	// reassigns them, so any app pods still on the dataplane are the caller's
+	// to clean up like the rest of its pods. (Draining is stricter — it refuses
+	// while apps are assigned. Deletion may start evicting apps in the future.)
+	// The cluster's nodepool inventory is dropped when the cluster reaches
+	// DELETED — immediately for a DRAINED cluster, on leasor's report otherwise
+	// — and is not restored by UndeleteCluster.
 	DeleteCluster(context.Context, *connect.Request[cluster.DeleteRequest]) (*connect.Response[cluster.DeleteResponse], error)
+	// Undelete a soft-deleted cluster, restoring the spec, status and pool
+	// assignment it had when it was deleted. It always comes back DRAINED,
+	// whatever state its deletion started from, and must be activated with
+	// UpdateClusterState before it takes work again. A DELETING cluster cannot
+	// be undeleted; its deletion has to finish first.
+	// Its co-named queue, if tombstoned, is restored with it, also DRAINED —
+	// even if that queue was deleted on its own before the cluster was. This is
+	// the only way to bring that queue back: UndeleteQueue refuses it while the
+	// cluster is deleted. A co-named queue still in DELETING (its own teardown
+	// unconfirmed) is not touched — it finishes deleting on leasor's report.
+	// The cluster's pool must not itself be soft-deleted: undelete the pool first.
+	// Undeleting a cluster that is not deleted is rejected.
+	UndeleteCluster(context.Context, *connect.Request[cluster.UndeleteRequest]) (*connect.Response[cluster.UndeleteResponse], error)
+	// List clusters within an organization.
+	// Soft-deleted clusters are excluded unless the request filters on the deleted_at field:
+	// function EXISTS lists only soft-deleted clusters (the only clusters that carry
+	// Cluster.deleted_at), function NOT_EXISTS is the default of live clusters only.
+	// This is how a client discovers a deleted cluster to pass to UndeleteCluster.
+	// A DELETING cluster is still live and always listed: leasor relies on this
+	// to see it and finish its deletion.
 	ListClusters(context.Context, *connect.Request[cluster.ListRequest]) (*connect.Response[cluster.ListResponse], error)
 	Count(context.Context, *connect.Request[cluster.CountRequest]) (*connect.Response[cluster.CountResponse], error)
+	// WatchClusters streams the cluster list for the Cluster List page and the
+	// Queue -> Clusters tab: one ClusterSummary per cluster, carrying everything
+	// a list row renders (control-plane lifecycle, tunnel and queues alongside
+	// the reported health, resources and versions), so a client needs no
+	// ListClusters call beside it. The full in-scope set is re-sent whenever it
+	// changes (~heartbeat cadence). gRPC / Connect streaming only (no
+	// HTTP/gateway binding), matching WatchQueueMetrics.
+	WatchClusters(context.Context, *connect.Request[cluster.WatchClustersRequest], *connect.ServerStream[cluster.WatchClustersResponse]) error
+	// WatchClusterHealth streams the full health snapshot for a single cluster —
+	// the cluster detail pages (Overview / Components / Details tabs). The snapshot
+	// is re-sent whenever the cluster's state changes (~heartbeat cadence). gRPC /
+	// Connect streaming only (no HTTP/gateway binding), matching WatchClusters.
+	WatchClusterHealth(context.Context, *connect.Request[cluster.WatchClusterHealthRequest], *connect.ServerStream[cluster.WatchClusterHealthResponse]) error
+	// GetClusterSnapshot returns the latest snapshot the cluster's operator
+	// reported (ClusterStatusService.ReportClusterSnapshot), in full: every section
+	// of ClusterSnapshot, not only the ones the detail pages render. Unary, so the
+	// CLI, the SDK and plain HTTP clients can read it; WatchClusterHealth is the
+	// live channel for the detail pages.
+	//
+	// The health rollup (snapshot.detail.health) is the control plane's verdict,
+	// not the operator's last word: it accounts for a cluster that has stopped
+	// reporting, and for a required dependency (propeller, proxy, storage) whose
+	// check keeps failing, which makes the cluster UNHEALTHY however the operator
+	// rolled it up. Everything else is returned as the operator sent it, and a
+	// section the operator did not report is left unset.
+	//
+	// A cluster whose operator does not push snapshots yet is served from its
+	// UpdateStatus heartbeat, which fills the sections the heartbeat carries. A
+	// cluster that has never reported returns WAITING health and no observed_at.
+	// NotFound is reserved for a cluster that does not exist (or is soft-deleted).
+	GetClusterSnapshot(context.Context, *connect.Request[cluster.GetClusterSnapshotRequest]) (*connect.Response[cluster.GetClusterSnapshotResponse], error)
+	// WatchClusterUsage streams leasor's view of what is running on each
+	// cluster: the demand it has scheduled for dispatch there and not yet seen finish
+	// (ClusterUsage). This is the cluster-side counterpart of
+	// QueueService.WatchQueueMetrics and is served the same way: the cluster
+	// service checks the clusters exist, then relays leasor's stream. A
+	// snapshot is sent immediately and then on a fixed tick. gRPC / Connect
+	// streaming only (no HTTP/gateway binding), matching WatchClusters.
+	WatchClusterUsage(context.Context, *connect.Request[cluster.WatchClusterUsageRequest], *connect.ServerStream[cluster.WatchClusterUsageResponse]) error
 }
 
 // NewClusterServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -200,6 +614,24 @@ func NewClusterServiceHandler(svc ClusterServiceHandler, opts ...connect.Handler
 		ClusterServiceHeartbeatProcedure,
 		svc.Heartbeat,
 		connect.WithSchema(clusterServiceHeartbeatMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	clusterServiceCreateClusterHandler := connect.NewUnaryHandler(
+		ClusterServiceCreateClusterProcedure,
+		svc.CreateCluster,
+		connect.WithSchema(clusterServiceCreateClusterMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	clusterServiceUpdateClusterHandler := connect.NewUnaryHandler(
+		ClusterServiceUpdateClusterProcedure,
+		svc.UpdateCluster,
+		connect.WithSchema(clusterServiceUpdateClusterMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	clusterServiceUpdateClusterStateHandler := connect.NewUnaryHandler(
+		ClusterServiceUpdateClusterStateProcedure,
+		svc.UpdateClusterState,
+		connect.WithSchema(clusterServiceUpdateClusterStateMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	clusterServiceCreateTunnelHandler := connect.NewUnaryHandler(
@@ -226,6 +658,12 @@ func NewClusterServiceHandler(svc ClusterServiceHandler, opts ...connect.Handler
 		connect.WithSchema(clusterServiceDeleteClusterMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	clusterServiceUndeleteClusterHandler := connect.NewUnaryHandler(
+		ClusterServiceUndeleteClusterProcedure,
+		svc.UndeleteCluster,
+		connect.WithSchema(clusterServiceUndeleteClusterMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	clusterServiceListClustersHandler := connect.NewUnaryHandler(
 		ClusterServiceListClustersProcedure,
 		svc.ListClusters,
@@ -238,10 +676,44 @@ func NewClusterServiceHandler(svc ClusterServiceHandler, opts ...connect.Handler
 		connect.WithSchema(clusterServiceCountMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	clusterServiceWatchClustersHandler := connect.NewServerStreamHandler(
+		ClusterServiceWatchClustersProcedure,
+		svc.WatchClusters,
+		connect.WithSchema(clusterServiceWatchClustersMethodDescriptor),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	clusterServiceWatchClusterHealthHandler := connect.NewServerStreamHandler(
+		ClusterServiceWatchClusterHealthProcedure,
+		svc.WatchClusterHealth,
+		connect.WithSchema(clusterServiceWatchClusterHealthMethodDescriptor),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	clusterServiceGetClusterSnapshotHandler := connect.NewUnaryHandler(
+		ClusterServiceGetClusterSnapshotProcedure,
+		svc.GetClusterSnapshot,
+		connect.WithSchema(clusterServiceGetClusterSnapshotMethodDescriptor),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	clusterServiceWatchClusterUsageHandler := connect.NewServerStreamHandler(
+		ClusterServiceWatchClusterUsageProcedure,
+		svc.WatchClusterUsage,
+		connect.WithSchema(clusterServiceWatchClusterUsageMethodDescriptor),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/cloudidl.cluster.ClusterService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ClusterServiceHeartbeatProcedure:
 			clusterServiceHeartbeatHandler.ServeHTTP(w, r)
+		case ClusterServiceCreateClusterProcedure:
+			clusterServiceCreateClusterHandler.ServeHTTP(w, r)
+		case ClusterServiceUpdateClusterProcedure:
+			clusterServiceUpdateClusterHandler.ServeHTTP(w, r)
+		case ClusterServiceUpdateClusterStateProcedure:
+			clusterServiceUpdateClusterStateHandler.ServeHTTP(w, r)
 		case ClusterServiceCreateTunnelProcedure:
 			clusterServiceCreateTunnelHandler.ServeHTTP(w, r)
 		case ClusterServiceUpdateStatusProcedure:
@@ -250,10 +722,20 @@ func NewClusterServiceHandler(svc ClusterServiceHandler, opts ...connect.Handler
 			clusterServiceGetClusterHandler.ServeHTTP(w, r)
 		case ClusterServiceDeleteClusterProcedure:
 			clusterServiceDeleteClusterHandler.ServeHTTP(w, r)
+		case ClusterServiceUndeleteClusterProcedure:
+			clusterServiceUndeleteClusterHandler.ServeHTTP(w, r)
 		case ClusterServiceListClustersProcedure:
 			clusterServiceListClustersHandler.ServeHTTP(w, r)
 		case ClusterServiceCountProcedure:
 			clusterServiceCountHandler.ServeHTTP(w, r)
+		case ClusterServiceWatchClustersProcedure:
+			clusterServiceWatchClustersHandler.ServeHTTP(w, r)
+		case ClusterServiceWatchClusterHealthProcedure:
+			clusterServiceWatchClusterHealthHandler.ServeHTTP(w, r)
+		case ClusterServiceGetClusterSnapshotProcedure:
+			clusterServiceGetClusterSnapshotHandler.ServeHTTP(w, r)
+		case ClusterServiceWatchClusterUsageProcedure:
+			clusterServiceWatchClusterUsageHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -265,6 +747,18 @@ type UnimplementedClusterServiceHandler struct{}
 
 func (UnimplementedClusterServiceHandler) Heartbeat(context.Context, *connect.Request[cluster.HeartbeatRequest]) (*connect.Response[cluster.HeartbeatRequestResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("cloudidl.cluster.ClusterService.Heartbeat is not implemented"))
+}
+
+func (UnimplementedClusterServiceHandler) CreateCluster(context.Context, *connect.Request[cluster.CreateClusterRequest]) (*connect.Response[cluster.CreateClusterResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("cloudidl.cluster.ClusterService.CreateCluster is not implemented"))
+}
+
+func (UnimplementedClusterServiceHandler) UpdateCluster(context.Context, *connect.Request[cluster.UpdateClusterRequest]) (*connect.Response[cluster.UpdateClusterResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("cloudidl.cluster.ClusterService.UpdateCluster is not implemented"))
+}
+
+func (UnimplementedClusterServiceHandler) UpdateClusterState(context.Context, *connect.Request[cluster.UpdateClusterStateRequest]) (*connect.Response[cluster.UpdateClusterStateResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("cloudidl.cluster.ClusterService.UpdateClusterState is not implemented"))
 }
 
 func (UnimplementedClusterServiceHandler) CreateTunnel(context.Context, *connect.Request[cluster.CreateTunnelRequest]) (*connect.Response[cluster.CreateTunnelResponse], error) {
@@ -283,10 +777,30 @@ func (UnimplementedClusterServiceHandler) DeleteCluster(context.Context, *connec
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("cloudidl.cluster.ClusterService.DeleteCluster is not implemented"))
 }
 
+func (UnimplementedClusterServiceHandler) UndeleteCluster(context.Context, *connect.Request[cluster.UndeleteRequest]) (*connect.Response[cluster.UndeleteResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("cloudidl.cluster.ClusterService.UndeleteCluster is not implemented"))
+}
+
 func (UnimplementedClusterServiceHandler) ListClusters(context.Context, *connect.Request[cluster.ListRequest]) (*connect.Response[cluster.ListResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("cloudidl.cluster.ClusterService.ListClusters is not implemented"))
 }
 
 func (UnimplementedClusterServiceHandler) Count(context.Context, *connect.Request[cluster.CountRequest]) (*connect.Response[cluster.CountResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("cloudidl.cluster.ClusterService.Count is not implemented"))
+}
+
+func (UnimplementedClusterServiceHandler) WatchClusters(context.Context, *connect.Request[cluster.WatchClustersRequest], *connect.ServerStream[cluster.WatchClustersResponse]) error {
+	return connect.NewError(connect.CodeUnimplemented, errors.New("cloudidl.cluster.ClusterService.WatchClusters is not implemented"))
+}
+
+func (UnimplementedClusterServiceHandler) WatchClusterHealth(context.Context, *connect.Request[cluster.WatchClusterHealthRequest], *connect.ServerStream[cluster.WatchClusterHealthResponse]) error {
+	return connect.NewError(connect.CodeUnimplemented, errors.New("cloudidl.cluster.ClusterService.WatchClusterHealth is not implemented"))
+}
+
+func (UnimplementedClusterServiceHandler) GetClusterSnapshot(context.Context, *connect.Request[cluster.GetClusterSnapshotRequest]) (*connect.Response[cluster.GetClusterSnapshotResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("cloudidl.cluster.ClusterService.GetClusterSnapshot is not implemented"))
+}
+
+func (UnimplementedClusterServiceHandler) WatchClusterUsage(context.Context, *connect.Request[cluster.WatchClusterUsageRequest], *connect.ServerStream[cluster.WatchClusterUsageResponse]) error {
+	return connect.NewError(connect.CodeUnimplemented, errors.New("cloudidl.cluster.ClusterService.WatchClusterUsage is not implemented"))
 }

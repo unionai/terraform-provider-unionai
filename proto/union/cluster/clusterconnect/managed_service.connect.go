@@ -36,6 +36,15 @@ const (
 	// ManagedClusterServiceCreateProcedure is the fully-qualified name of the ManagedClusterService's
 	// Create RPC.
 	ManagedClusterServiceCreateProcedure = "/cloudidl.cluster.ManagedClusterService/Create"
+	// ManagedClusterServiceCreateFleetManagedClusterProcedure is the fully-qualified name of the
+	// ManagedClusterService's CreateFleetManagedCluster RPC.
+	ManagedClusterServiceCreateFleetManagedClusterProcedure = "/cloudidl.cluster.ManagedClusterService/CreateFleetManagedCluster"
+	// ManagedClusterServiceSetNodeGroupsProcedure is the fully-qualified name of the
+	// ManagedClusterService's SetNodeGroups RPC.
+	ManagedClusterServiceSetNodeGroupsProcedure = "/cloudidl.cluster.ManagedClusterService/SetNodeGroups"
+	// ManagedClusterServiceGetNodeGroupsProcedure is the fully-qualified name of the
+	// ManagedClusterService's GetNodeGroups RPC.
+	ManagedClusterServiceGetNodeGroupsProcedure = "/cloudidl.cluster.ManagedClusterService/GetNodeGroups"
 	// ManagedClusterServiceGetProcedure is the fully-qualified name of the ManagedClusterService's Get
 	// RPC.
 	ManagedClusterServiceGetProcedure = "/cloudidl.cluster.ManagedClusterService/Get"
@@ -52,18 +61,66 @@ const (
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
 var (
-	managedClusterServiceServiceDescriptor               = cluster.File_cluster_managed_service_proto.Services().ByName("ManagedClusterService")
-	managedClusterServiceCreateMethodDescriptor          = managedClusterServiceServiceDescriptor.Methods().ByName("Create")
-	managedClusterServiceGetMethodDescriptor             = managedClusterServiceServiceDescriptor.Methods().ByName("Get")
-	managedClusterServiceListMethodDescriptor            = managedClusterServiceServiceDescriptor.Methods().ByName("List")
-	managedClusterServiceListDisplayInfoMethodDescriptor = managedClusterServiceServiceDescriptor.Methods().ByName("ListDisplayInfo")
-	managedClusterServiceDeleteMethodDescriptor          = managedClusterServiceServiceDescriptor.Methods().ByName("Delete")
+	managedClusterServiceServiceDescriptor                         = cluster.File_cluster_managed_service_proto.Services().ByName("ManagedClusterService")
+	managedClusterServiceCreateMethodDescriptor                    = managedClusterServiceServiceDescriptor.Methods().ByName("Create")
+	managedClusterServiceCreateFleetManagedClusterMethodDescriptor = managedClusterServiceServiceDescriptor.Methods().ByName("CreateFleetManagedCluster")
+	managedClusterServiceSetNodeGroupsMethodDescriptor             = managedClusterServiceServiceDescriptor.Methods().ByName("SetNodeGroups")
+	managedClusterServiceGetNodeGroupsMethodDescriptor             = managedClusterServiceServiceDescriptor.Methods().ByName("GetNodeGroups")
+	managedClusterServiceGetMethodDescriptor                       = managedClusterServiceServiceDescriptor.Methods().ByName("Get")
+	managedClusterServiceListMethodDescriptor                      = managedClusterServiceServiceDescriptor.Methods().ByName("List")
+	managedClusterServiceListDisplayInfoMethodDescriptor           = managedClusterServiceServiceDescriptor.Methods().ByName("ListDisplayInfo")
+	managedClusterServiceDeleteMethodDescriptor                    = managedClusterServiceServiceDescriptor.Methods().ByName("Delete")
 )
 
 // ManagedClusterServiceClient is a client for the cloudidl.cluster.ManagedClusterService service.
 type ManagedClusterServiceClient interface {
 	// Create new unprovisioned managed cluster
 	Create(context.Context, *connect.Request[cluster.ManagedClusterServiceCreateRequest]) (*connect.Response[cluster.ManagedClusterServiceCreateResponse], error)
+	// Create a Fleet-managed cluster for the calling organization.
+	CreateFleetManagedCluster(context.Context, *connect.Request[cluster.CreateFleetManagedClusterRequest]) (*connect.Response[cluster.CreateFleetManagedClusterResponse], error)
+	// SetNodeGroups sets a cluster's node groups through the API, for example from the CLI. For a
+	// Union-provisioned cluster it is one of two entry points to the same node-group write.
+	// Provisioning uses the other one: the node groups it states travel on `Create`, which writes
+	// them in the same transaction as the cluster spec. Both entry points store the groups the same
+	// way and move the same change counter. For a customer-managed cluster it is the only entry
+	// point: `Create` drops any node groups it is sent for such a cluster and keeps the stored ones.
+	//
+	// Who may write here depends on who manages the cluster. A Union-provisioned (BYOC,
+	// `CLUSTER_TYPE_MANAGED_PLUS`) cluster's node groups are Union's: only the deployment's
+	// unionai-admin tenant may write them, and every other caller, the customer included, is
+	// refused with PermissionDenied. A cluster whose type was never recorded is treated the same
+	// way. A customer-managed cluster takes the write from its own organization (MANAGE_CLUSTER on
+	// the cluster) or from a Union admin. A conflict is rejected at the write rather than resolved by
+	// ranking sources at read time.
+	//
+	// For a Union-provisioned cluster, provisioning restates the node groups on its next `Create`,
+	// so the cluster's provisioning spec stays the source of truth: an API write lasts until the
+	// next provisioning run. A lasting change to such a cluster's node groups belongs in its spec,
+	// followed by a provisioning run.
+	//
+	// A customer-managed cluster's node groups are the customer's alone, so provisioning never
+	// overwrites them: a write here lasts until the next write here.
+	//
+	// With `expected_generation` set, a write against a cluster that has moved on is refused with
+	// Aborted; the caller should re-read with GetNodeGroups and retry.
+	//
+	// The REST path names the organization as well as the cluster. A two-segment
+	// `{id.name}/node_groups` shape would be ambiguous with `Get`'s
+	// `/managed_cluster/api/v1/{id.org.name}/{id.name}` binding — `/managed_cluster/api/v1/acme/
+	// node_groups` would match both, and which one won would depend on registration order — so the
+	// organization is in the path rather than left to the context. It is required on the identifier
+	// in any case.
+	SetNodeGroups(context.Context, *connect.Request[cluster.SetNodeGroupsRequest]) (*connect.Response[cluster.SetNodeGroupsResponse], error)
+	// GetNodeGroups reads a cluster's declared node groups back, without the console's filtering.
+	//
+	// ListDisplayInfo is the console's view and strips taints that are noise in a table; a caller
+	// editing the declaration needs what was stored. The generation is returned alongside so a
+	// read-modify-write can pass it to SetNodeGroups and be refused rather than clobber a concurrent
+	// edit. It is the stored counter, which every node-group write sets in the same statement as the
+	// groups; a cluster whose node groups have never been written reports 0, which asks for no check.
+	// Organization in the path, for the same reason as SetNodeGroups above: a two-segment shape
+	// collides with `Get`'s `{id.org.name}/{id.name}` binding.
+	GetNodeGroups(context.Context, *connect.Request[cluster.GetNodeGroupsRequest]) (*connect.Response[cluster.GetNodeGroupsResponse], error)
 	Get(context.Context, *connect.Request[cluster.ManagedClusterServiceGetRequest]) (*connect.Response[cluster.ManagedClusterServiceGetResponse], error)
 	List(context.Context, *connect.Request[cluster.ManagedClusterServiceListRequest]) (*connect.Response[cluster.ManagedClusterServiceListResponse], error)
 	ListDisplayInfo(context.Context, *connect.Request[cluster.ManagedClusterServiceListDisplayInfoRequest]) (*connect.Response[cluster.ManagedClusterServiceListDisplayInfoResponse], error)
@@ -85,6 +142,24 @@ func NewManagedClusterServiceClient(httpClient connect.HTTPClient, baseURL strin
 			httpClient,
 			baseURL+ManagedClusterServiceCreateProcedure,
 			connect.WithSchema(managedClusterServiceCreateMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		createFleetManagedCluster: connect.NewClient[cluster.CreateFleetManagedClusterRequest, cluster.CreateFleetManagedClusterResponse](
+			httpClient,
+			baseURL+ManagedClusterServiceCreateFleetManagedClusterProcedure,
+			connect.WithSchema(managedClusterServiceCreateFleetManagedClusterMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		setNodeGroups: connect.NewClient[cluster.SetNodeGroupsRequest, cluster.SetNodeGroupsResponse](
+			httpClient,
+			baseURL+ManagedClusterServiceSetNodeGroupsProcedure,
+			connect.WithSchema(managedClusterServiceSetNodeGroupsMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		getNodeGroups: connect.NewClient[cluster.GetNodeGroupsRequest, cluster.GetNodeGroupsResponse](
+			httpClient,
+			baseURL+ManagedClusterServiceGetNodeGroupsProcedure,
+			connect.WithSchema(managedClusterServiceGetNodeGroupsMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 		get: connect.NewClient[cluster.ManagedClusterServiceGetRequest, cluster.ManagedClusterServiceGetResponse](
@@ -116,16 +191,34 @@ func NewManagedClusterServiceClient(httpClient connect.HTTPClient, baseURL strin
 
 // managedClusterServiceClient implements ManagedClusterServiceClient.
 type managedClusterServiceClient struct {
-	create          *connect.Client[cluster.ManagedClusterServiceCreateRequest, cluster.ManagedClusterServiceCreateResponse]
-	get             *connect.Client[cluster.ManagedClusterServiceGetRequest, cluster.ManagedClusterServiceGetResponse]
-	list            *connect.Client[cluster.ManagedClusterServiceListRequest, cluster.ManagedClusterServiceListResponse]
-	listDisplayInfo *connect.Client[cluster.ManagedClusterServiceListDisplayInfoRequest, cluster.ManagedClusterServiceListDisplayInfoResponse]
-	delete          *connect.Client[cluster.ManagedClusterServiceDeleteRequest, cluster.ManagedClusterServiceDeleteResponse]
+	create                    *connect.Client[cluster.ManagedClusterServiceCreateRequest, cluster.ManagedClusterServiceCreateResponse]
+	createFleetManagedCluster *connect.Client[cluster.CreateFleetManagedClusterRequest, cluster.CreateFleetManagedClusterResponse]
+	setNodeGroups             *connect.Client[cluster.SetNodeGroupsRequest, cluster.SetNodeGroupsResponse]
+	getNodeGroups             *connect.Client[cluster.GetNodeGroupsRequest, cluster.GetNodeGroupsResponse]
+	get                       *connect.Client[cluster.ManagedClusterServiceGetRequest, cluster.ManagedClusterServiceGetResponse]
+	list                      *connect.Client[cluster.ManagedClusterServiceListRequest, cluster.ManagedClusterServiceListResponse]
+	listDisplayInfo           *connect.Client[cluster.ManagedClusterServiceListDisplayInfoRequest, cluster.ManagedClusterServiceListDisplayInfoResponse]
+	delete                    *connect.Client[cluster.ManagedClusterServiceDeleteRequest, cluster.ManagedClusterServiceDeleteResponse]
 }
 
 // Create calls cloudidl.cluster.ManagedClusterService.Create.
 func (c *managedClusterServiceClient) Create(ctx context.Context, req *connect.Request[cluster.ManagedClusterServiceCreateRequest]) (*connect.Response[cluster.ManagedClusterServiceCreateResponse], error) {
 	return c.create.CallUnary(ctx, req)
+}
+
+// CreateFleetManagedCluster calls cloudidl.cluster.ManagedClusterService.CreateFleetManagedCluster.
+func (c *managedClusterServiceClient) CreateFleetManagedCluster(ctx context.Context, req *connect.Request[cluster.CreateFleetManagedClusterRequest]) (*connect.Response[cluster.CreateFleetManagedClusterResponse], error) {
+	return c.createFleetManagedCluster.CallUnary(ctx, req)
+}
+
+// SetNodeGroups calls cloudidl.cluster.ManagedClusterService.SetNodeGroups.
+func (c *managedClusterServiceClient) SetNodeGroups(ctx context.Context, req *connect.Request[cluster.SetNodeGroupsRequest]) (*connect.Response[cluster.SetNodeGroupsResponse], error) {
+	return c.setNodeGroups.CallUnary(ctx, req)
+}
+
+// GetNodeGroups calls cloudidl.cluster.ManagedClusterService.GetNodeGroups.
+func (c *managedClusterServiceClient) GetNodeGroups(ctx context.Context, req *connect.Request[cluster.GetNodeGroupsRequest]) (*connect.Response[cluster.GetNodeGroupsResponse], error) {
+	return c.getNodeGroups.CallUnary(ctx, req)
 }
 
 // Get calls cloudidl.cluster.ManagedClusterService.Get.
@@ -153,6 +246,51 @@ func (c *managedClusterServiceClient) Delete(ctx context.Context, req *connect.R
 type ManagedClusterServiceHandler interface {
 	// Create new unprovisioned managed cluster
 	Create(context.Context, *connect.Request[cluster.ManagedClusterServiceCreateRequest]) (*connect.Response[cluster.ManagedClusterServiceCreateResponse], error)
+	// Create a Fleet-managed cluster for the calling organization.
+	CreateFleetManagedCluster(context.Context, *connect.Request[cluster.CreateFleetManagedClusterRequest]) (*connect.Response[cluster.CreateFleetManagedClusterResponse], error)
+	// SetNodeGroups sets a cluster's node groups through the API, for example from the CLI. For a
+	// Union-provisioned cluster it is one of two entry points to the same node-group write.
+	// Provisioning uses the other one: the node groups it states travel on `Create`, which writes
+	// them in the same transaction as the cluster spec. Both entry points store the groups the same
+	// way and move the same change counter. For a customer-managed cluster it is the only entry
+	// point: `Create` drops any node groups it is sent for such a cluster and keeps the stored ones.
+	//
+	// Who may write here depends on who manages the cluster. A Union-provisioned (BYOC,
+	// `CLUSTER_TYPE_MANAGED_PLUS`) cluster's node groups are Union's: only the deployment's
+	// unionai-admin tenant may write them, and every other caller, the customer included, is
+	// refused with PermissionDenied. A cluster whose type was never recorded is treated the same
+	// way. A customer-managed cluster takes the write from its own organization (MANAGE_CLUSTER on
+	// the cluster) or from a Union admin. A conflict is rejected at the write rather than resolved by
+	// ranking sources at read time.
+	//
+	// For a Union-provisioned cluster, provisioning restates the node groups on its next `Create`,
+	// so the cluster's provisioning spec stays the source of truth: an API write lasts until the
+	// next provisioning run. A lasting change to such a cluster's node groups belongs in its spec,
+	// followed by a provisioning run.
+	//
+	// A customer-managed cluster's node groups are the customer's alone, so provisioning never
+	// overwrites them: a write here lasts until the next write here.
+	//
+	// With `expected_generation` set, a write against a cluster that has moved on is refused with
+	// Aborted; the caller should re-read with GetNodeGroups and retry.
+	//
+	// The REST path names the organization as well as the cluster. A two-segment
+	// `{id.name}/node_groups` shape would be ambiguous with `Get`'s
+	// `/managed_cluster/api/v1/{id.org.name}/{id.name}` binding — `/managed_cluster/api/v1/acme/
+	// node_groups` would match both, and which one won would depend on registration order — so the
+	// organization is in the path rather than left to the context. It is required on the identifier
+	// in any case.
+	SetNodeGroups(context.Context, *connect.Request[cluster.SetNodeGroupsRequest]) (*connect.Response[cluster.SetNodeGroupsResponse], error)
+	// GetNodeGroups reads a cluster's declared node groups back, without the console's filtering.
+	//
+	// ListDisplayInfo is the console's view and strips taints that are noise in a table; a caller
+	// editing the declaration needs what was stored. The generation is returned alongside so a
+	// read-modify-write can pass it to SetNodeGroups and be refused rather than clobber a concurrent
+	// edit. It is the stored counter, which every node-group write sets in the same statement as the
+	// groups; a cluster whose node groups have never been written reports 0, which asks for no check.
+	// Organization in the path, for the same reason as SetNodeGroups above: a two-segment shape
+	// collides with `Get`'s `{id.org.name}/{id.name}` binding.
+	GetNodeGroups(context.Context, *connect.Request[cluster.GetNodeGroupsRequest]) (*connect.Response[cluster.GetNodeGroupsResponse], error)
 	Get(context.Context, *connect.Request[cluster.ManagedClusterServiceGetRequest]) (*connect.Response[cluster.ManagedClusterServiceGetResponse], error)
 	List(context.Context, *connect.Request[cluster.ManagedClusterServiceListRequest]) (*connect.Response[cluster.ManagedClusterServiceListResponse], error)
 	ListDisplayInfo(context.Context, *connect.Request[cluster.ManagedClusterServiceListDisplayInfoRequest]) (*connect.Response[cluster.ManagedClusterServiceListDisplayInfoResponse], error)
@@ -170,6 +308,24 @@ func NewManagedClusterServiceHandler(svc ManagedClusterServiceHandler, opts ...c
 		ManagedClusterServiceCreateProcedure,
 		svc.Create,
 		connect.WithSchema(managedClusterServiceCreateMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	managedClusterServiceCreateFleetManagedClusterHandler := connect.NewUnaryHandler(
+		ManagedClusterServiceCreateFleetManagedClusterProcedure,
+		svc.CreateFleetManagedCluster,
+		connect.WithSchema(managedClusterServiceCreateFleetManagedClusterMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	managedClusterServiceSetNodeGroupsHandler := connect.NewUnaryHandler(
+		ManagedClusterServiceSetNodeGroupsProcedure,
+		svc.SetNodeGroups,
+		connect.WithSchema(managedClusterServiceSetNodeGroupsMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	managedClusterServiceGetNodeGroupsHandler := connect.NewUnaryHandler(
+		ManagedClusterServiceGetNodeGroupsProcedure,
+		svc.GetNodeGroups,
+		connect.WithSchema(managedClusterServiceGetNodeGroupsMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	managedClusterServiceGetHandler := connect.NewUnaryHandler(
@@ -200,6 +356,12 @@ func NewManagedClusterServiceHandler(svc ManagedClusterServiceHandler, opts ...c
 		switch r.URL.Path {
 		case ManagedClusterServiceCreateProcedure:
 			managedClusterServiceCreateHandler.ServeHTTP(w, r)
+		case ManagedClusterServiceCreateFleetManagedClusterProcedure:
+			managedClusterServiceCreateFleetManagedClusterHandler.ServeHTTP(w, r)
+		case ManagedClusterServiceSetNodeGroupsProcedure:
+			managedClusterServiceSetNodeGroupsHandler.ServeHTTP(w, r)
+		case ManagedClusterServiceGetNodeGroupsProcedure:
+			managedClusterServiceGetNodeGroupsHandler.ServeHTTP(w, r)
 		case ManagedClusterServiceGetProcedure:
 			managedClusterServiceGetHandler.ServeHTTP(w, r)
 		case ManagedClusterServiceListProcedure:
@@ -219,6 +381,18 @@ type UnimplementedManagedClusterServiceHandler struct{}
 
 func (UnimplementedManagedClusterServiceHandler) Create(context.Context, *connect.Request[cluster.ManagedClusterServiceCreateRequest]) (*connect.Response[cluster.ManagedClusterServiceCreateResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("cloudidl.cluster.ManagedClusterService.Create is not implemented"))
+}
+
+func (UnimplementedManagedClusterServiceHandler) CreateFleetManagedCluster(context.Context, *connect.Request[cluster.CreateFleetManagedClusterRequest]) (*connect.Response[cluster.CreateFleetManagedClusterResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("cloudidl.cluster.ManagedClusterService.CreateFleetManagedCluster is not implemented"))
+}
+
+func (UnimplementedManagedClusterServiceHandler) SetNodeGroups(context.Context, *connect.Request[cluster.SetNodeGroupsRequest]) (*connect.Response[cluster.SetNodeGroupsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("cloudidl.cluster.ManagedClusterService.SetNodeGroups is not implemented"))
+}
+
+func (UnimplementedManagedClusterServiceHandler) GetNodeGroups(context.Context, *connect.Request[cluster.GetNodeGroupsRequest]) (*connect.Response[cluster.GetNodeGroupsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("cloudidl.cluster.ManagedClusterService.GetNodeGroups is not implemented"))
 }
 
 func (UnimplementedManagedClusterServiceHandler) Get(context.Context, *connect.Request[cluster.ManagedClusterServiceGetRequest]) (*connect.Response[cluster.ManagedClusterServiceGetResponse], error) {
