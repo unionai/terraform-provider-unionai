@@ -4,8 +4,10 @@ import (
 	"context"
 	"crypto/tls"
 	"os"
+	"slices"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -34,6 +36,22 @@ type providerContext struct {
 	org         string
 	host        string
 	assignments *identityAssignmentCache
+	// allowedOrgs is the provider's allowed_orgs. Empty allows any organization.
+	allowedOrgs []string
+}
+
+// checkOrgAllowed refuses an organization outside allowed_orgs. Resources that accept an org
+// override call it so the override cannot reach past the allowlist.
+func (c *providerContext) checkOrgAllowed(org string) diag.Diagnostics {
+	var diags diag.Diagnostics
+	if len(c.allowedOrgs) == 0 || slices.Contains(c.allowedOrgs, org) {
+		return diags
+	}
+	diags.AddError(
+		"Union.ai org is not allowed",
+		"Union.ai org "+org+" is not allowed. Please add it to allowed_orgs attribute.",
+	)
+	return diags
 }
 
 func (p *UnionaiProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -109,26 +127,14 @@ func (p *UnionaiProvider) Configure(ctx context.Context, req provider.ConfigureR
 		host:        apiTokenConfig.Host,
 		assignments: newIdentityAssignmentCache(),
 	}
+	for _, org := range data.AllowedOrgs.Elements() {
+		client.allowedOrgs = append(client.allowedOrgs, org.(types.String).ValueString())
+	}
 	resp.DataSourceData = client
 	resp.ResourceData = client
 
-	if len(data.AllowedOrgs.Elements()) > 0 {
-		// Check if our org is allowed
-		allowed := false
-		for _, org := range data.AllowedOrgs.Elements() {
-			if org.(types.String).ValueString() == client.org {
-				allowed = true
-				break
-			}
-		}
-		if !allowed {
-			resp.Diagnostics.AddError(
-				"Union.ai org is not allowed",
-				"Union.ai org "+client.org+" is not allowed. Please add it to allowed_orgs attribute.",
-			)
-			return
-		}
-	}
+	// Check if our org is allowed
+	resp.Diagnostics.Append(client.checkOrgAllowed(client.org)...)
 }
 
 func (p *UnionaiProvider) Resources(ctx context.Context) []func() resource.Resource {

@@ -120,11 +120,12 @@ func equalNodeGroups(left, right []*cluster.NodeGroup) bool {
 // in-process fake instead of a control plane.
 type nodeGroupsTestProvider struct {
 	UnionaiProvider
-	conn *grpc.ClientConn
+	conn        *grpc.ClientConn
+	allowedOrgs []string
 }
 
 func (p *nodeGroupsTestProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
-	client := &providerContext{conn: p.conn, org: "acme"}
+	client := &providerContext{conn: p.conn, org: "acme", allowedOrgs: p.allowedOrgs}
 	resp.ResourceData = client
 	resp.DataSourceData = client
 }
@@ -138,16 +139,18 @@ func (p *nodeGroupsTestProvider) DataSources(ctx context.Context) []func() datas
 }
 
 // newNodeGroupsTestServer starts the fake with a customer-managed cluster `acme/prod` and a
-// BYOC cluster `acme/byoc`, and returns provider factories wired to it.
-func newNodeGroupsTestServer(t *testing.T) (*fakeManagedClusterServer, map[string]func() (tfprotov6.ProviderServer, error)) {
+// BYOC cluster `acme/byoc`, and returns provider factories wired to it. allowedOrgs stands in for
+// the provider's allowed_orgs.
+func newNodeGroupsTestServer(t *testing.T, allowedOrgs ...string) (*fakeManagedClusterServer, map[string]func() (tfprotov6.ProviderServer, error)) {
 	t.Helper()
 	if _, err := exec.LookPath("terraform"); err != nil {
 		t.Skip("terraform CLI not found in PATH")
 	}
 
 	fake := &fakeManagedClusterServer{clusters: map[string]*fakeCluster{
-		"acme/prod": {},
-		"acme/byoc": {byoc: true},
+		"acme/prod":  {},
+		"acme/byoc":  {byoc: true},
+		"other/prod": {},
 	}}
 
 	listener := bufconn.Listen(1 << 20)
@@ -166,7 +169,7 @@ func newNodeGroupsTestServer(t *testing.T) (*fakeManagedClusterServer, map[strin
 	t.Cleanup(func() { _ = conn.Close() })
 
 	factories := map[string]func() (tfprotov6.ProviderServer, error){
-		"unionai": providerserver.NewProtocol6WithError(&nodeGroupsTestProvider{UnionaiProvider: UnionaiProvider{version: "test"}, conn: conn}),
+		"unionai": providerserver.NewProtocol6WithError(&nodeGroupsTestProvider{UnionaiProvider: UnionaiProvider{version: "test"}, conn: conn, allowedOrgs: allowedOrgs}),
 	}
 	return fake, factories
 }
@@ -393,6 +396,81 @@ func TestNodeGroupsResource_BYOCClusterRefused(t *testing.T) {
 			},
 		},
 	})
+}
+
+func TestNodeGroupsResource_RespectsAllowedOrgs(t *testing.T) {
+	fake, factories := newNodeGroupsTestServer(t, "acme")
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories,
+		Steps: []resource.TestStep{
+			{
+				Config: `
+resource "unionai_node_groups" "test" {
+  org     = "other"
+  cluster = "prod"
+` + nodeGroupCPU + `
+}
+`,
+				ExpectError: regexp.MustCompile(`Union.ai org other is not allowed`),
+			},
+			{
+				Config: `
+data "unionai_node_groups" "test" {
+  org     = "other"
+  cluster = "prod"
+}
+`,
+				ExpectError: regexp.MustCompile(`Union.ai org other is not allowed`),
+			},
+			{
+				Config:        `resource "unionai_node_groups" "test" {}`,
+				ResourceName:  "unionai_node_groups.test",
+				ImportState:   true,
+				ImportStateId: "other/prod",
+				ExpectError:   regexp.MustCompile(`Union.ai org other is not allowed`),
+			},
+		},
+	})
+
+	if groups := fake.clusters["other/prod"].groups; len(groups) != 0 {
+		t.Errorf("other/prod was written despite allowed_orgs: %v", groups)
+	}
+}
+
+// A value unknown at plan time skips ValidateConfig, so it must be checked at apply rather than
+// wrapped into a uint32 (4294967296 would become 0, meaning unbounded).
+func TestNodeGroupsResource_ValidatesAtApply(t *testing.T) {
+	fake, factories := newNodeGroupsTestServer(t)
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories,
+		Steps: []resource.TestStep{
+			{
+				Config: `
+resource "terraform_data" "max_nodes" {
+  input = 4294967296
+}
+
+resource "unionai_node_groups" "test" {
+  cluster = "prod"
+
+  node_group {
+    name                = "cpu"
+    max_nodes           = terraform_data.max_nodes.output
+    node_disk_size_gbs  = 100
+    node_instance_types = ["m6i.2xlarge"]
+  }
+}
+`,
+				ExpectError: regexp.MustCompile(`max_nodes must be between 0 and 4294967295`),
+			},
+		},
+	})
+
+	if generation := fake.clusters["acme/prod"].generation; generation != 0 {
+		t.Errorf("acme/prod was written despite an invalid max_nodes (generation %d)", generation)
+	}
 }
 
 func TestNodeGroupsResource_ValidatesAtPlan(t *testing.T) {

@@ -19,8 +19,9 @@ func NewNodeGroupsDataSource() datasource.DataSource {
 
 // NodeGroupsDataSource defines the data source implementation.
 type NodeGroupsDataSource struct {
-	conn cluster.ManagedClusterServiceClient
-	org  string
+	conn   cluster.ManagedClusterServiceClient
+	org    string
+	client *providerContext
 }
 
 // NodeGroupsDataSourceModel describes the data source data model.
@@ -127,6 +128,7 @@ func (d *NodeGroupsDataSource) Configure(ctx context.Context, req datasource.Con
 
 	d.conn = cluster.NewManagedClusterServiceClient(client.conn)
 	d.org = client.org
+	d.client = client
 }
 
 func (d *NodeGroupsDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -143,6 +145,10 @@ func (d *NodeGroupsDataSource) Read(ctx context.Context, req datasource.ReadRequ
 		data.Org = types.StringValue(d.org)
 	}
 	org, clusterName := data.Org.ValueString(), data.Cluster.ValueString()
+	resp.Diagnostics.Append(d.client.checkOrgAllowed(org)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	got, err := d.conn.GetNodeGroups(ctx, &cluster.GetNodeGroupsRequest{Id: managedClusterId(org, clusterName)})
 	if err != nil {

@@ -31,8 +31,9 @@ func NewNodeGroupsResource() resource.Resource {
 // NodeGroupsResource owns every node group declared on one cluster. SetNodeGroups replaces the
 // whole set, so a resource per group could not work: each write would delete the others.
 type NodeGroupsResource struct {
-	conn cluster.ManagedClusterServiceClient
-	org  string
+	conn   cluster.ManagedClusterServiceClient
+	org    string
+	client *providerContext
 }
 
 // NodeGroupsResourceModel describes the resource data model.
@@ -217,6 +218,7 @@ func (r *NodeGroupsResource) Configure(ctx context.Context, req resource.Configu
 
 	r.conn = cluster.NewManagedClusterServiceClient(client.conn)
 	r.org = client.org
+	r.client = client
 }
 
 // ValidateConfig checks each group against the API's validation rules, and that names are
@@ -267,6 +269,10 @@ func (r *NodeGroupsResource) Create(ctx context.Context, req resource.CreateRequ
 		data.Org = types.StringValue(r.org)
 	}
 	org, clusterName := data.Org.ValueString(), data.Cluster.ValueString()
+	resp.Diagnostics.Append(r.client.checkOrgAllowed(org)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	// Read first so the write is checked against what is there, and so the user hears which
 	// existing groups this replaces.
@@ -314,6 +320,10 @@ func (r *NodeGroupsResource) Read(ctx context.Context, req resource.ReadRequest,
 	}
 
 	org, clusterName := data.Org.ValueString(), data.Cluster.ValueString()
+	resp.Diagnostics.Append(r.client.checkOrgAllowed(org)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 	got, err := r.conn.GetNodeGroups(ctx, &cluster.GetNodeGroupsRequest{Id: managedClusterId(org, clusterName)})
 	if err != nil {
 		if status.Code(err) == codes.NotFound {
@@ -361,6 +371,10 @@ func (r *NodeGroupsResource) Update(ctx context.Context, req resource.UpdateRequ
 	}
 
 	org, clusterName := data.Org.ValueString(), data.Cluster.ValueString()
+	resp.Diagnostics.Append(r.client.checkOrgAllowed(org)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	groups, diags := nodeGroupsFromSet(ctx, data.NodeGroups)
 	resp.Diagnostics.Append(diags...)
@@ -392,6 +406,10 @@ func (r *NodeGroupsResource) Delete(ctx context.Context, req resource.DeleteRequ
 	}
 
 	org, clusterName := data.Org.ValueString(), data.Cluster.ValueString()
+	resp.Diagnostics.Append(r.client.checkOrgAllowed(org)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 	_, err := r.setNodeGroups(ctx, org, clusterName, nil, uint64(data.Generation.ValueInt64()))
 	if err != nil {
 		if status.Code(err) == codes.NotFound {
@@ -412,6 +430,10 @@ func (r *NodeGroupsResource) ImportState(ctx context.Context, req resource.Impor
 			"Invalid import ID",
 			fmt.Sprintf("Expected `org/cluster` or `cluster`, got %q.", req.ID),
 		)
+		return
+	}
+	resp.Diagnostics.Append(r.client.checkOrgAllowed(org)...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
@@ -452,6 +474,25 @@ func nodeGroupsFromSet(ctx context.Context, set types.Set) ([]*cluster.NodeGroup
 	sort.Slice(models, func(i, j int) bool {
 		return models[i].Name.ValueString() < models[j].Name.ValueString()
 	})
+
+	// Values unknown at plan time skipped ValidateConfig, so check again now that they are
+	// resolved, before nodeGroupFromModel narrows them.
+	seen := map[string]bool{}
+	for _, model := range models {
+		diags.Append(validateNodeGroup(ctx, model)...)
+		name := model.Name.ValueString()
+		if seen[name] {
+			diags.AddAttributeError(
+				path.Root("node_group"),
+				"Duplicate node group name",
+				fmt.Sprintf("Node group %q is declared more than once. Names must be unique within a cluster.", name),
+			)
+		}
+		seen[name] = true
+	}
+	if diags.HasError() {
+		return nil, diags
+	}
 
 	groups := make([]*cluster.NodeGroup, 0, len(models))
 	for _, model := range models {
