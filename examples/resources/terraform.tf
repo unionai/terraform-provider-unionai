@@ -3,6 +3,10 @@ terraform {
     unionai = {
       source = "unionai/unionai"
     }
+    # Only for the Karpenter example in node_groups.tf.
+    kubernetes = {
+      source = "hashicorp/kubernetes"
+    }
   }
 }
 
