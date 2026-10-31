@@ -3,14 +3,15 @@ package provider
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
@@ -77,9 +78,6 @@ func (r *RoleResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 				MarkdownDescription: "Policy actions",
 				Required:            true,
 				ElementType:         types.StringType,
-				PlanModifiers: []planmodifier.Set{
-					setplanmodifier.RequiresReplace(),
-				},
 			},
 		},
 	}
@@ -136,7 +134,11 @@ func (r *RoleResource) Create(ctx context.Context, req resource.CreateRequest, r
 		return
 	}
 
-	actionErrors := false
+	actions := roleActions(ctx, data.Actions, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	createRequest := &authorizer.CreateRoleRequest{
 		Role: &common.Role{
 			Id: &common.RoleIdentifier{
@@ -147,27 +149,8 @@ func (r *RoleResource) Create(ctx context.Context, req resource.CreateRequest, r
 				Description: data.Description.ValueString(),
 			},
 			RoleType: common.RoleType_ROLE_TYPE_CUSTOM,
-			Actions: func() []common.Action {
-				var actions []string
-				if diag := data.Actions.ElementsAs(ctx, &actions, false); diag.HasError() {
-					return nil
-				}
-				out := make([]common.Action, len(actions))
-				for i, a := range actions {
-					action := common.Action_value[strings.ToUpper(fmt.Sprintf("action_%s", a))]
-					if action == int32(common.Action_ACTION_NONE) {
-						resp.Diagnostics.AddError("Action does not exist", fmt.Sprintf("Cannot find action: %s", a))
-						actionErrors = true
-					}
-					out[i] = common.Action(action)
-				}
-				return out
-			}(),
+			Actions:  actions,
 		},
-	}
-
-	if actionErrors {
-		return
 	}
 
 	tflog.Debug(ctx, "CreateRole request", map[string]interface{}{
@@ -224,13 +207,38 @@ func (r *RoleResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 }
 
 func (r *RoleResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var data RoleResourceModel
+	var data, state RoleResourceModel
 
 	// Read Terraform plan data into the model
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	planned := roleActions(ctx, data.Actions, &resp.Diagnostics)
+	current := roleActions(ctx, state.Actions, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	id := &common.RoleIdentifier{
+		Name:         data.Id.ValueString(),
+		Organization: r.org,
+	}
+	// Add before removing so the role never holds less than either set.
+	for _, a := range actionsNotIn(planned, current) {
+		if _, err := r.conn.CreateRoleAction(ctx, &authorizer.CreateRoleActionRequest{Id: id, Action: a}); err != nil {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to add action %s to role, got error: %s", a, err))
+			return
+		}
+	}
+	for _, a := range actionsNotIn(current, planned) {
+		if _, err := r.conn.DeleteRoleAction(ctx, &authorizer.DeleteRoleActionRequest{Id: id, Action: a}); err != nil {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to remove action %s from role, got error: %s", a, err))
+			return
+		}
 	}
 
 	// Save updated data into Terraform state
@@ -261,4 +269,28 @@ func (r *RoleResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 
 func (r *RoleResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+}
+
+func roleActions(ctx context.Context, set types.Set, diags *diag.Diagnostics) []common.Action {
+	var actions []string
+	diags.Append(set.ElementsAs(ctx, &actions, false)...)
+	out := make([]common.Action, len(actions))
+	for i, a := range actions {
+		action := common.Action_value[strings.ToUpper(fmt.Sprintf("action_%s", a))]
+		if action == int32(common.Action_ACTION_NONE) {
+			diags.AddError("Action does not exist", fmt.Sprintf("Cannot find action: %s", a))
+		}
+		out[i] = common.Action(action)
+	}
+	return out
+}
+
+func actionsNotIn(actions, other []common.Action) []common.Action {
+	var out []common.Action
+	for _, a := range actions {
+		if !slices.Contains(other, a) {
+			out = append(out, a)
+		}
+	}
+	return out
 }

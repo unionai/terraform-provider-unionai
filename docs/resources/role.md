@@ -9,7 +9,7 @@ description: |-
 
 Manages a Union.ai role. Roles define a set of actions that can be performed within the organization.
 
-**Note:** Changing any attribute will force replacement of the resource.
+**Note:** Changing `name` or `description` forces replacement of the resource. Changing `actions` adds and removes actions on the existing role.
 
 ## Example Usage
 
@@ -29,7 +29,7 @@ resource "unionai_role" "example" {
 ### Required
 
 - `name` (String) The name of the role. Changing this forces a new resource to be created.
-- `actions` (Set of String) The set of actions that this role grants. Changing this forces a new resource to be created. Common values: `administer_account`, `administer_project`, `create_flyte_executions`, `edit_cluster_related_attributes`, `edit_execution_related_attributes`, `edit_unused_attributes`, `manage_cluster`, `manage_permissions`, `register_flyte_inventory`, `view_flyte_executions`, `view_flyte_inventory`.
+- `actions` (Set of String) The set of actions that this role grants. Changes are applied in place, adding new actions before removing old ones. Common values: `administer_account`, `administer_project`, `create_flyte_executions`, `edit_cluster_related_attributes`, `edit_execution_related_attributes`, `edit_settings`, `edit_unused_attributes`, `manage_apps`, `manage_artifacts`, `manage_cluster`, `manage_permissions`, `manage_secrets`, `manage_triggers`, `manage_workspaces`, `register_flyte_inventory`, `view_apps`, `view_artifacts`, `view_clusters`, `view_flyte_executions`, `view_flyte_inventory`, `view_identities`, `view_permissions`, `view_secrets`, `view_settings`, `view_triggers`, `view_usage`, `view_workspaces`.
 
 ### Optional
 
