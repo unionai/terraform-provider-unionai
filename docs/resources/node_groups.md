@@ -81,7 +81,7 @@ resource "unionai_node_groups" "staging" {
 
 ### Node groups derived from Karpenter NodePools
 
-On an EKS cluster where Karpenter provides the capacity, read the node groups off the `EC2NodeClass` and `NodePool` manifests instead of repeating their values, so the two cannot drift apart. Karpenter spells capacity types and architectures in lowercase (`on-demand`, `amd64`), so the example converts them. A NodePool is bounded by `limits` rather than a node count, so `min_nodes` and `max_nodes` stay unset. This needs the `kubernetes` provider configured for the cluster.
+On an EKS cluster where Karpenter provides the capacity, read the node groups off the `EC2NodeClass` and `NodePool` manifests instead of repeating their values, so the two cannot drift apart. Karpenter spells capacity types and architectures in lowercase (`on-demand`, `amd64`), so the example converts them. A NodePool is bounded by `limits` rather than a node count, so `min_nodes` and `max_nodes` stay unset. This needs the `kubernetes` provider configured for the cluster, so the example lives in its own directory, `examples/resources/node_groups_karpenter`. It targets a different cluster from the examples above: a cluster must have exactly one `unionai_node_groups` resource.
 
 ```terraform
 locals {
@@ -117,10 +117,10 @@ resource "kubernetes_manifest" "karpenter_node_class" {
     kind       = "EC2NodeClass"
     metadata   = { name = "default" }
     spec = {
-      role                       = "KarpenterNodeRole-prod-us-east-2"
+      role                       = "KarpenterNodeRole-karpenter-us-east-2"
       amiSelectorTerms           = [{ alias = "al2023@latest" }]
-      subnetSelectorTerms        = [{ tags = { "karpenter.sh/discovery" = "prod-us-east-2" } }]
-      securityGroupSelectorTerms = [{ tags = { "karpenter.sh/discovery" = "prod-us-east-2" } }]
+      subnetSelectorTerms        = [{ tags = { "karpenter.sh/discovery" = "karpenter-us-east-2" } }]
+      securityGroupSelectorTerms = [{ tags = { "karpenter.sh/discovery" = "karpenter-us-east-2" } }]
       kubelet                    = { maxPods = 110 }
       blockDeviceMappings = [{
         deviceName = "/dev/xvda"
@@ -173,7 +173,7 @@ locals {
 }
 
 resource "unionai_node_groups" "karpenter" {
-  cluster = "prod-us-east-2"
+  cluster = "karpenter-us-east-2"
 
   dynamic "node_group" {
     for_each = local.karpenter_node_groups

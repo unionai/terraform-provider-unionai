@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/unionai/cloud/gen/pb-go/cluster"
 	"google.golang.org/grpc/codes"
@@ -230,29 +231,22 @@ func (r *NodeGroupsResource) ValidateConfig(ctx context.Context, req resource.Va
 		return
 	}
 
-	var groups []nodeGroupModel
 	// A group built from unknown values (a dynamic block, say) cannot be decoded yet; the
-	// server validates it at apply instead.
-	if diags := data.NodeGroups.ElementsAs(ctx, &groups, false); diags.HasError() {
-		return
-	}
-
-	seen := map[string]bool{}
-	for _, group := range groups {
-		resp.Diagnostics.Append(validateNodeGroup(ctx, group)...)
-		if !known(group.Name) {
+	// server validates it at apply instead. Decoding one group at a time keeps the check for
+	// the groups that are known.
+	var groups []nodeGroupModel
+	for _, element := range data.NodeGroups.Elements() {
+		object, ok := element.(types.Object)
+		if !ok || object.IsUnknown() {
 			continue
 		}
-		name := group.Name.ValueString()
-		if seen[name] {
-			resp.Diagnostics.AddAttributeError(
-				path.Root("node_group"),
-				"Duplicate node group name",
-				fmt.Sprintf("Node group %q is declared more than once. Names must be unique within a cluster.", name),
-			)
+		var group nodeGroupModel
+		if diags := object.As(ctx, &group, basetypes.ObjectAsOptions{}); diags.HasError() {
+			continue
 		}
-		seen[name] = true
+		groups = append(groups, group)
 	}
+	resp.Diagnostics.Append(validateNodeGroups(ctx, groups)...)
 }
 
 func (r *NodeGroupsResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -477,19 +471,7 @@ func nodeGroupsFromSet(ctx context.Context, set types.Set) ([]*cluster.NodeGroup
 
 	// Values unknown at plan time skipped ValidateConfig, so check again now that they are
 	// resolved, before nodeGroupFromModel narrows them.
-	seen := map[string]bool{}
-	for _, model := range models {
-		diags.Append(validateNodeGroup(ctx, model)...)
-		name := model.Name.ValueString()
-		if seen[name] {
-			diags.AddAttributeError(
-				path.Root("node_group"),
-				"Duplicate node group name",
-				fmt.Sprintf("Node group %q is declared more than once. Names must be unique within a cluster.", name),
-			)
-		}
-		seen[name] = true
-	}
+	diags.Append(validateNodeGroups(ctx, models)...)
 	if diags.HasError() {
 		return nil, diags
 	}

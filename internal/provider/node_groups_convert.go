@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"fmt"
-	"math"
 	"regexp"
 	"sort"
 	"strings"
@@ -11,6 +10,7 @@ import (
 	"github.com/flyteorg/flyte/flyteidl/gen/pb-go/flyteidl/core"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/unionai/cloud/gen/pb-go/cluster"
 	"github.com/unionai/cloud/gen/pb-go/common"
@@ -103,60 +103,75 @@ func managedClusterId(org, name string) *common.ManagedClusterIdentifier {
 	}
 }
 
-func capacityTypeFromString(s string) (cluster.CapacityType, bool) {
-	v, ok := cluster.CapacityType_value[capacityTypePrefix+s]
-	if !ok || v == int32(cluster.CapacityType_CAPACITY_TYPE_UNSPECIFIED) {
+func capacityTypeFromString(text string) (cluster.CapacityType, bool) {
+	value, ok := cluster.CapacityType_value[capacityTypePrefix+text]
+	if !ok || value == int32(cluster.CapacityType_CAPACITY_TYPE_UNSPECIFIED) {
 		return cluster.CapacityType_CAPACITY_TYPE_UNSPECIFIED, false
 	}
-	return cluster.CapacityType(v), true
+	return cluster.CapacityType(value), true
 }
 
-func capacityTypeToString(c cluster.CapacityType) string {
-	return strings.TrimPrefix(c.String(), capacityTypePrefix)
+// capacityTypeToString is false for a value this provider has no name for, such as an enum
+// value added to the API after this provider was built.
+func capacityTypeToString(capacityType cluster.CapacityType) (string, bool) {
+	name, ok := cluster.CapacityType_name[int32(capacityType)]
+	if !ok || capacityType == cluster.CapacityType_CAPACITY_TYPE_UNSPECIFIED {
+		return "", false
+	}
+	return strings.TrimPrefix(name, capacityTypePrefix), true
 }
 
-func architectureFromString(s string) (cluster.NodeArchitecture, bool) {
-	v, ok := cluster.NodeArchitecture_value[architecturePrefix+s]
-	if !ok || v == int32(cluster.NodeArchitecture_NODE_ARCHITECTURE_UNSPECIFIED) {
+func architectureFromString(text string) (cluster.NodeArchitecture, bool) {
+	value, ok := cluster.NodeArchitecture_value[architecturePrefix+text]
+	if !ok || value == int32(cluster.NodeArchitecture_NODE_ARCHITECTURE_UNSPECIFIED) {
 		return cluster.NodeArchitecture_NODE_ARCHITECTURE_UNSPECIFIED, false
 	}
-	return cluster.NodeArchitecture(v), true
+	return cluster.NodeArchitecture(value), true
 }
 
-func taintEffectFromString(s string) (cluster.TaintEffect, bool) {
+// architectureToString is false for a value this provider has no name for. Unspecified is
+// represented as null by the caller, so it is false too.
+func architectureToString(architecture cluster.NodeArchitecture) (string, bool) {
+	name, ok := cluster.NodeArchitecture_name[int32(architecture)]
+	if !ok || architecture == cluster.NodeArchitecture_NODE_ARCHITECTURE_UNSPECIFIED {
+		return "", false
+	}
+	return strings.TrimPrefix(name, architecturePrefix), true
+}
+
+func taintEffectFromString(text string) (cluster.TaintEffect, bool) {
 	for effect, name := range taintEffectNames {
-		if name == s {
+		if name == text {
 			return effect, true
 		}
 	}
 	return cluster.TaintEffect_UNSPECIFIED, false
 }
 
-func taintEffectToString(e cluster.TaintEffect) string {
-	if name, ok := taintEffectNames[e]; ok {
-		return name
-	}
-	return e.String()
+// taintEffectToString is false for an effect this provider has no name for.
+func taintEffectToString(effect cluster.TaintEffect) (string, bool) {
+	name, ok := taintEffectNames[effect]
+	return name, ok
 }
 
 // Allocatable resource keys are the flyteidl ResourceName values in lower case: cpu, gpu,
 // memory, storage, ephemeral_storage.
-func resourceNameFromString(s string) (core.Resources_ResourceName, bool) {
-	v, ok := core.Resources_ResourceName_value[strings.ToUpper(s)]
-	if !ok || v == int32(core.Resources_UNKNOWN) || s != strings.ToLower(s) {
+func resourceNameFromString(text string) (core.Resources_ResourceName, bool) {
+	value, ok := core.Resources_ResourceName_value[strings.ToUpper(text)]
+	if !ok || value == int32(core.Resources_UNKNOWN) || text != strings.ToLower(text) {
 		return core.Resources_UNKNOWN, false
 	}
-	return core.Resources_ResourceName(v), true
+	return core.Resources_ResourceName(value), true
 }
 
-func resourceNameToString(n core.Resources_ResourceName) string {
-	return strings.ToLower(n.String())
+func resourceNameToString(resourceName core.Resources_ResourceName) string {
+	return strings.ToLower(resourceName.String())
 }
 
 func enumNames(prefix string, values map[string]int32) []string {
 	var names []string
-	for name, v := range values {
-		if v != 0 {
+	for name, value := range values {
+		if value != 0 {
 			names = append(names, strings.TrimPrefix(name, prefix))
 		}
 	}
@@ -186,13 +201,24 @@ func validTaintEffects() []string {
 
 // nodeGroupToModel converts a stored node group into its Terraform shape. Collections come back
 // empty rather than null, matching the schema defaults, so a group that never set them reads
-// back without a diff.
+// back without a diff. An enum value this provider has no name for is an error rather than a
+// state value the provider would refuse to write back.
 func nodeGroupToModel(ctx context.Context, group *cluster.NodeGroup) (nodeGroupModel, diag.Diagnostics) {
 	var diags diag.Diagnostics
+	unsupported := func(what string, value fmt.Stringer) {
+		diags.AddError("Unsupported node group "+what,
+			fmt.Sprintf("Node group %q has %s %s, which this version of the provider does not know. Upgrade the provider.",
+				group.GetName(), what, value))
+	}
 
 	capacityTypes := make([]string, 0, len(group.GetCapacityTypes()))
 	for _, capacityType := range group.GetCapacityTypes() {
-		capacityTypes = append(capacityTypes, capacityTypeToString(capacityType))
+		name, ok := capacityTypeToString(capacityType)
+		if !ok {
+			unsupported("capacity type", capacityType)
+			continue
+		}
+		capacityTypes = append(capacityTypes, name)
 	}
 
 	allocatable := make(map[string]string, len(group.GetAllocatableResources()))
@@ -226,29 +252,37 @@ func nodeGroupToModel(ctx context.Context, group *cluster.NodeGroup) (nodeGroupM
 		Accelerators:    make([]acceleratorModel, 0, len(group.GetAccelerators())),
 	}
 	if group.GetArchitecture() != cluster.NodeArchitecture_NODE_ARCHITECTURE_UNSPECIFIED {
-		model.Architecture = types.StringValue(strings.TrimPrefix(group.GetArchitecture().String(), architecturePrefix))
+		name, ok := architectureToString(group.GetArchitecture())
+		if !ok {
+			unsupported("architecture", group.GetArchitecture())
+		}
+		model.Architecture = types.StringValue(name)
 	}
 	if group.Weight != nil {
 		model.Weight = types.Int64Value(int64(group.GetWeight()))
 	}
 
-	var d diag.Diagnostics
-	model.NodeInstanceTypes, d = types.ListValueFrom(ctx, types.StringType, instanceTypes)
-	diags.Append(d...)
-	model.CapacityTypes, d = types.ListValueFrom(ctx, types.StringType, capacityTypes)
-	diags.Append(d...)
-	model.Labels, d = types.MapValueFrom(ctx, types.StringType, labels)
-	diags.Append(d...)
-	model.Limits, d = types.MapValueFrom(ctx, types.StringType, limits)
-	diags.Append(d...)
-	model.AllocatableResources, d = types.MapValueFrom(ctx, types.StringType, allocatable)
-	diags.Append(d...)
+	var convertDiags diag.Diagnostics
+	model.NodeInstanceTypes, convertDiags = types.ListValueFrom(ctx, types.StringType, instanceTypes)
+	diags.Append(convertDiags...)
+	model.CapacityTypes, convertDiags = types.ListValueFrom(ctx, types.StringType, capacityTypes)
+	diags.Append(convertDiags...)
+	model.Labels, convertDiags = types.MapValueFrom(ctx, types.StringType, labels)
+	diags.Append(convertDiags...)
+	model.Limits, convertDiags = types.MapValueFrom(ctx, types.StringType, limits)
+	diags.Append(convertDiags...)
+	model.AllocatableResources, convertDiags = types.MapValueFrom(ctx, types.StringType, allocatable)
+	diags.Append(convertDiags...)
 
 	for _, taint := range group.GetTaints() {
+		effect, ok := taintEffectToString(taint.GetEffect())
+		if !ok {
+			unsupported("taint effect", taint.GetEffect())
+		}
 		model.Taints = append(model.Taints, taintModel{
 			Key:    types.StringValue(taint.GetKey()),
 			Value:  types.StringValue(taint.GetValue()),
-			Effect: types.StringValue(taintEffectToString(taint.GetEffect())),
+			Effect: types.StringValue(effect),
 		})
 	}
 	for _, accelerator := range group.GetAccelerators() {
@@ -365,10 +399,10 @@ func nodeGroupFromModel(ctx context.Context, model nodeGroupModel) (*cluster.Nod
 	if !model.CapacityTypes.IsNull() {
 		diags.Append(model.CapacityTypes.ElementsAs(ctx, &capacityTypes, false)...)
 	}
-	for _, s := range capacityTypes {
-		capacityType, ok := capacityTypeFromString(s)
+	for _, text := range capacityTypes {
+		capacityType, ok := capacityTypeFromString(text)
 		if !ok {
-			diags.AddError("Invalid capacity type", fmt.Sprintf("Node group %q: unknown capacity type %q.", name, s))
+			diags.AddError("Invalid capacity type", fmt.Sprintf("Node group %q: unknown capacity type %q.", name, text))
 			continue
 		}
 		group.CapacityTypes = append(group.CapacityTypes, capacityType)
@@ -421,6 +455,29 @@ func nodeGroupFromModel(ctx context.Context, model nodeGroupModel) (*cluster.Nod
 	return group, diags
 }
 
+// validateNodeGroups checks each group, and that names are unique within the cluster. Unknown
+// names are skipped.
+func validateNodeGroups(ctx context.Context, models []nodeGroupModel) diag.Diagnostics {
+	var diags diag.Diagnostics
+	seen := map[string]bool{}
+	for _, model := range models {
+		diags.Append(validateNodeGroup(ctx, model)...)
+		if !known(model.Name) {
+			continue
+		}
+		name := model.Name.ValueString()
+		if seen[name] {
+			diags.AddAttributeError(
+				path.Root("node_group"),
+				"Duplicate node group name",
+				fmt.Sprintf("Node group %q is declared more than once. Names must be unique within a cluster.", name),
+			)
+		}
+		seen[name] = true
+	}
+	return diags
+}
+
 // validateNodeGroup mirrors the buf.validate rules on NodeGroup, plus a couple of checks the
 // server cannot make, so mistakes surface at plan time. Unknown values are skipped; the server
 // checks them at apply.
@@ -434,12 +491,8 @@ func validateNodeGroup(ctx context.Context, model nodeGroupModel) diag.Diagnosti
 	}
 
 	checkUint32 := func(attribute string, value types.Int64, minimum int64) {
-		if value.IsNull() || value.IsUnknown() {
-			return
-		}
-		if value.ValueInt64() < minimum || value.ValueInt64() > math.MaxUint32 {
-			diags.AddError("Invalid node group "+attribute,
-				fmt.Sprintf("Node group %q: %s must be between %d and %d, got %d.", name, attribute, minimum, uint32(math.MaxUint32), value.ValueInt64()))
+		if _, problem := int64ToUint32(attribute, value, minimum); problem != "" {
+			diags.AddError("Invalid node group "+attribute, fmt.Sprintf("Node group %q: %s", name, problem))
 		}
 	}
 	checkUint32("min_nodes", model.MinNodes, 0)

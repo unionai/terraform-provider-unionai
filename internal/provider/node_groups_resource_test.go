@@ -39,7 +39,7 @@ type fakeManagedClusterServer struct {
 	clusters map[string]*fakeCluster
 	// beforeSet, when set, runs once inside the next SetNodeGroups, to simulate an edit that
 	// lands between Terraform's read and its write.
-	beforeSet func(c *fakeCluster)
+	beforeSet func(managed *fakeCluster)
 }
 
 type fakeCluster struct {
@@ -49,45 +49,45 @@ type fakeCluster struct {
 }
 
 func (s *fakeManagedClusterServer) lookup(org, name string) (*fakeCluster, error) {
-	c, ok := s.clusters[org+"/"+name]
+	managed, ok := s.clusters[org+"/"+name]
 	if !ok {
 		return nil, status.Errorf(codes.NotFound, "cluster %s/%s not found", org, name)
 	}
-	return c, nil
+	return managed, nil
 }
 
 func (s *fakeManagedClusterServer) GetNodeGroups(ctx context.Context, req *cluster.GetNodeGroupsRequest) (*cluster.GetNodeGroupsResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	c, err := s.lookup(req.GetId().GetOrg().GetName(), req.GetId().GetName())
+	managed, err := s.lookup(req.GetId().GetOrg().GetName(), req.GetId().GetName())
 	if err != nil {
 		return nil, err
 	}
-	return &cluster.GetNodeGroupsResponse{NodeGroups: cloneNodeGroups(c.groups), Generation: c.generation}, nil
+	return &cluster.GetNodeGroupsResponse{NodeGroups: cloneNodeGroups(managed.groups), Generation: managed.generation}, nil
 }
 
 func (s *fakeManagedClusterServer) SetNodeGroups(ctx context.Context, req *cluster.SetNodeGroupsRequest) (*cluster.SetNodeGroupsResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	c, err := s.lookup(req.GetId().GetOrg().GetName(), req.GetId().GetName())
+	managed, err := s.lookup(req.GetId().GetOrg().GetName(), req.GetId().GetName())
 	if err != nil {
 		return nil, err
 	}
-	if c.byoc {
+	if managed.byoc {
 		return nil, status.Error(codes.PermissionDenied, "node groups of a Union-provisioned cluster are managed by Union")
 	}
 	if s.beforeSet != nil {
-		s.beforeSet(c)
+		s.beforeSet(managed)
 		s.beforeSet = nil
 	}
-	if req.GetExpectedGeneration() != 0 && req.GetExpectedGeneration() != c.generation {
-		return nil, status.Errorf(codes.Aborted, "expected generation %d, cluster is at %d", req.GetExpectedGeneration(), c.generation)
+	if req.GetExpectedGeneration() != 0 && req.GetExpectedGeneration() != managed.generation {
+		return nil, status.Errorf(codes.Aborted, "expected generation %d, cluster is at %d", req.GetExpectedGeneration(), managed.generation)
 	}
-	if !equalNodeGroups(c.groups, req.GetNodeGroups()) {
-		c.generation++
+	if !equalNodeGroups(managed.groups, req.GetNodeGroups()) {
+		managed.generation++
 	}
-	c.groups = cloneNodeGroups(req.GetNodeGroups())
-	return &cluster.SetNodeGroupsResponse{Generation: c.generation}, nil
+	managed.groups = cloneNodeGroups(req.GetNodeGroups())
+	return &cluster.SetNodeGroupsResponse{Generation: managed.generation}, nil
 }
 
 func (s *fakeManagedClusterServer) groups(key string) []*cluster.NodeGroup {
@@ -302,7 +302,7 @@ func TestNodeGroupsResource_Lifecycle(t *testing.T) {
 			{
 				PreConfig: func() {
 					fake.mu.Lock()
-					fake.beforeSet = func(c *fakeCluster) { c.generation++ }
+					fake.beforeSet = func(managed *fakeCluster) { managed.generation++ }
 					fake.mu.Unlock()
 				},
 				Config:      nodeGroupsConfig("prod", nodeGroupGPU(6)),
@@ -361,9 +361,9 @@ func TestNodeGroupsResource_DetectsDrift(t *testing.T) {
 				PreConfig: func() {
 					fake.mu.Lock()
 					defer fake.mu.Unlock()
-					c := fake.clusters["acme/prod"]
-					c.groups[0].MaxNodes = 99
-					c.generation++
+					managed := fake.clusters["acme/prod"]
+					managed.groups[0].MaxNodes = 99
+					managed.generation++
 				},
 				Config:             nodeGroupsConfig("prod", nodeGroupCPU),
 				PlanOnly:           true,
@@ -473,6 +473,51 @@ resource "unionai_node_groups" "test" {
 	}
 }
 
+// A group whose taints are unknown at plan time is skipped, but the other groups are still
+// checked.
+func TestNodeGroupsResource_ValidatesKnownGroupsAtPlan(t *testing.T) {
+	_, factories := newNodeGroupsTestServer(t)
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories,
+		Steps: []resource.TestStep{
+			{
+				Config: `
+resource "terraform_data" "taints" {
+  input = [{ key = "k", effect = "NoSchedule" }]
+}
+
+resource "unionai_node_groups" "test" {
+  cluster = "prod"
+
+  node_group {
+    name                = "1-bad"
+    node_disk_size_gbs  = 100
+    node_instance_types = ["m6i.2xlarge"]
+  }
+
+  node_group {
+    name                = "dynamic"
+    node_disk_size_gbs  = 100
+    node_instance_types = ["m6i.2xlarge"]
+
+    dynamic "taint" {
+      for_each = terraform_data.taints.output
+      content {
+        key    = taint.value.key
+        effect = taint.value.effect
+      }
+    }
+  }
+}
+`,
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`Invalid node group name`),
+			},
+		},
+	})
+}
+
 func TestNodeGroupsResource_ValidatesAtPlan(t *testing.T) {
 	_, factories := newNodeGroupsTestServer(t)
 
@@ -516,6 +561,31 @@ func TestNodeGroupsResource_ValidatesAtPlan(t *testing.T) {
 				},
 			})
 		})
+	}
+}
+
+// A value the provider has no name for is reported rather than stored as something the
+// provider would then refuse to write back.
+func TestNodeGroupToModelRejectsUnknownEnums(t *testing.T) {
+	_, diags := nodeGroupToModel(context.Background(), &cluster.NodeGroup{
+		Name:          "a",
+		Taints:        []*cluster.Taint{{Key: "k", Effect: cluster.TaintEffect(99)}},
+		Architecture:  cluster.NodeArchitecture(99),
+		CapacityTypes: []cluster.CapacityType{cluster.CapacityType(99)},
+	})
+	if got := len(diags.Errors()); got != 3 {
+		t.Fatalf("got %d errors, want 3: %v", got, diags)
+	}
+	for _, wanted := range []string{"taint effect", "architecture", "capacity type"} {
+		found := false
+		for _, err := range diags.Errors() {
+			if regexp.MustCompile(wanted).MatchString(err.Summary()) {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("no error about %s in %v", wanted, diags)
+		}
 	}
 }
 
