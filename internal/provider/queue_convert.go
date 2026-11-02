@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"fmt"
-	"math"
 	"strings"
 	"time"
 
@@ -83,21 +82,13 @@ func timestampToTerraform(ts *timestamppb.Timestamp) types.String {
 
 // queueCountToUint32 converts one of the concurrency/depth knobs, all of which are uint32 on
 // the wire and use 0 to mean unlimited.
-func queueCountToUint32(v types.Int64, attribute string) (uint32, diag.Diagnostics) {
+func queueCountToUint32(value types.Int64, attribute string) (uint32, diag.Diagnostics) {
 	var diags diag.Diagnostics
-	if v.IsNull() || v.IsUnknown() {
-		return 0, diags
+	number, problem := int64ToUint32(attribute, value, 0)
+	if problem != "" {
+		diags.AddAttributeError(path.Root(attribute), "Value out of range", problem)
 	}
-	n := v.ValueInt64()
-	if n < 0 || n > math.MaxUint32 {
-		diags.AddAttributeError(
-			path.Root(attribute),
-			"Value out of range",
-			fmt.Sprintf("%s must be between 0 and %d, got %d.", attribute, uint32(math.MaxUint32), n),
-		)
-		return 0, diags
-	}
-	return uint32(n), diags
+	return number, diags
 }
 
 // buildQueueSpec assembles the complete spec from the plan. UpdateQueue replaces the spec

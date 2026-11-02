@@ -816,6 +816,110 @@ var _ interface {
 	ErrorName() string
 } = EnrichedIdentityValidationError{}
 
+// Validate checks the field values on ExternalIdentity with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// first error encountered is returned, or nil if there are no violations.
+func (m *ExternalIdentity) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on ExternalIdentity with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// ExternalIdentityMultiError, or nil if none found.
+func (m *ExternalIdentity) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *ExternalIdentity) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Subject
+
+	// no validation rules for Token
+
+	if len(errors) > 0 {
+		return ExternalIdentityMultiError(errors)
+	}
+
+	return nil
+}
+
+// ExternalIdentityMultiError is an error wrapping multiple validation errors
+// returned by ExternalIdentity.ValidateAll() if the designated constraints
+// aren't met.
+type ExternalIdentityMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m ExternalIdentityMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m ExternalIdentityMultiError) AllErrors() []error { return m }
+
+// ExternalIdentityValidationError is the validation error returned by
+// ExternalIdentity.Validate if the designated constraints aren't met.
+type ExternalIdentityValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e ExternalIdentityValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e ExternalIdentityValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e ExternalIdentityValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e ExternalIdentityValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e ExternalIdentityValidationError) ErrorName() string { return "ExternalIdentityValidationError" }
+
+// Error satisfies the builtin error interface
+func (e ExternalIdentityValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sExternalIdentity.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = ExternalIdentityValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = ExternalIdentityValidationError{}
+
 // Validate checks the field values on Identity with the rules defined in the
 // proto definition for this message. If any rules are violated, the first
 // error encountered is returned, or nil if there are no violations.
@@ -921,6 +1025,47 @@ func (m *Identity) validate(all bool) error {
 			}
 		}
 
+	case *Identity_ExternalIdentity:
+		if v == nil {
+			err := IdentityValidationError{
+				field:  "Principal",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetExternalIdentity()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, IdentityValidationError{
+						field:  "ExternalIdentity",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, IdentityValidationError{
+						field:  "ExternalIdentity",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetExternalIdentity()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return IdentityValidationError{
+					field:  "ExternalIdentity",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
 	default:
 		_ = v // ensures v is used
 	}
@@ -1001,3 +1146,160 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = IdentityValidationError{}
+
+// Validate checks the field values on Authorship with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *Authorship) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on Authorship with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in AuthorshipMultiError, or
+// nil if none found.
+func (m *Authorship) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *Authorship) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetCreatedBy()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, AuthorshipValidationError{
+					field:  "CreatedBy",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, AuthorshipValidationError{
+					field:  "CreatedBy",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetCreatedBy()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return AuthorshipValidationError{
+				field:  "CreatedBy",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if all {
+		switch v := interface{}(m.GetUpdatedBy()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, AuthorshipValidationError{
+					field:  "UpdatedBy",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, AuthorshipValidationError{
+					field:  "UpdatedBy",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetUpdatedBy()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return AuthorshipValidationError{
+				field:  "UpdatedBy",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return AuthorshipMultiError(errors)
+	}
+
+	return nil
+}
+
+// AuthorshipMultiError is an error wrapping multiple validation errors
+// returned by Authorship.ValidateAll() if the designated constraints aren't met.
+type AuthorshipMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m AuthorshipMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m AuthorshipMultiError) AllErrors() []error { return m }
+
+// AuthorshipValidationError is the validation error returned by
+// Authorship.Validate if the designated constraints aren't met.
+type AuthorshipValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e AuthorshipValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e AuthorshipValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e AuthorshipValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e AuthorshipValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e AuthorshipValidationError) ErrorName() string { return "AuthorshipValidationError" }
+
+// Error satisfies the builtin error interface
+func (e AuthorshipValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sAuthorship.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = AuthorshipValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = AuthorshipValidationError{}

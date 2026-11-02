@@ -274,6 +274,492 @@ var _ interface {
 	ErrorName() string
 } = ManagedClusterServiceCreateResponseValidationError{}
 
+// Validate checks the field values on CreateFleetManagedClusterRequest with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the first error encountered is returned, or nil if there are
+// no violations.
+func (m *CreateFleetManagedClusterRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on CreateFleetManagedClusterRequest with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the result is a list of violation errors wrapped in
+// CreateFleetManagedClusterRequestMultiError, or nil if none found.
+func (m *CreateFleetManagedClusterRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *CreateFleetManagedClusterRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Name
+
+	// no validation rules for CredentialsSecretRef
+
+	// no validation rules for ClusterPoolName
+
+	// no validation rules for Namespace
+
+	switch v := m.Vendor.(type) {
+	case *CreateFleetManagedClusterRequest_Aws:
+		if v == nil {
+			err := CreateFleetManagedClusterRequestValidationError{
+				field:  "Vendor",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetAws()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, CreateFleetManagedClusterRequestValidationError{
+						field:  "Aws",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, CreateFleetManagedClusterRequestValidationError{
+						field:  "Aws",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetAws()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return CreateFleetManagedClusterRequestValidationError{
+					field:  "Aws",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *CreateFleetManagedClusterRequest_Gcp:
+		if v == nil {
+			err := CreateFleetManagedClusterRequestValidationError{
+				field:  "Vendor",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetGcp()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, CreateFleetManagedClusterRequestValidationError{
+						field:  "Gcp",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, CreateFleetManagedClusterRequestValidationError{
+						field:  "Gcp",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetGcp()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return CreateFleetManagedClusterRequestValidationError{
+					field:  "Gcp",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *CreateFleetManagedClusterRequest_Azure:
+		if v == nil {
+			err := CreateFleetManagedClusterRequestValidationError{
+				field:  "Vendor",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetAzure()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, CreateFleetManagedClusterRequestValidationError{
+						field:  "Azure",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, CreateFleetManagedClusterRequestValidationError{
+						field:  "Azure",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetAzure()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return CreateFleetManagedClusterRequestValidationError{
+					field:  "Azure",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *CreateFleetManagedClusterRequest_Metal:
+		if v == nil {
+			err := CreateFleetManagedClusterRequestValidationError{
+				field:  "Vendor",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetMetal()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, CreateFleetManagedClusterRequestValidationError{
+						field:  "Metal",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, CreateFleetManagedClusterRequestValidationError{
+						field:  "Metal",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetMetal()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return CreateFleetManagedClusterRequestValidationError{
+					field:  "Metal",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *CreateFleetManagedClusterRequest_Oci:
+		if v == nil {
+			err := CreateFleetManagedClusterRequestValidationError{
+				field:  "Vendor",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetOci()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, CreateFleetManagedClusterRequestValidationError{
+						field:  "Oci",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, CreateFleetManagedClusterRequestValidationError{
+						field:  "Oci",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetOci()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return CreateFleetManagedClusterRequestValidationError{
+					field:  "Oci",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	default:
+		_ = v // ensures v is used
+	}
+
+	if len(errors) > 0 {
+		return CreateFleetManagedClusterRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// CreateFleetManagedClusterRequestMultiError is an error wrapping multiple
+// validation errors returned by
+// CreateFleetManagedClusterRequest.ValidateAll() if the designated
+// constraints aren't met.
+type CreateFleetManagedClusterRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m CreateFleetManagedClusterRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m CreateFleetManagedClusterRequestMultiError) AllErrors() []error { return m }
+
+// CreateFleetManagedClusterRequestValidationError is the validation error
+// returned by CreateFleetManagedClusterRequest.Validate if the designated
+// constraints aren't met.
+type CreateFleetManagedClusterRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e CreateFleetManagedClusterRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e CreateFleetManagedClusterRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e CreateFleetManagedClusterRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e CreateFleetManagedClusterRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e CreateFleetManagedClusterRequestValidationError) ErrorName() string {
+	return "CreateFleetManagedClusterRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e CreateFleetManagedClusterRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sCreateFleetManagedClusterRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = CreateFleetManagedClusterRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = CreateFleetManagedClusterRequestValidationError{}
+
+// Validate checks the field values on CreateFleetManagedClusterResponse with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the first error encountered is returned, or nil if there are
+// no violations.
+func (m *CreateFleetManagedClusterResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on CreateFleetManagedClusterResponse
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the result is a list of violation errors wrapped in
+// CreateFleetManagedClusterResponseMultiError, or nil if none found.
+func (m *CreateFleetManagedClusterResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *CreateFleetManagedClusterResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetCluster()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, CreateFleetManagedClusterResponseValidationError{
+					field:  "Cluster",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, CreateFleetManagedClusterResponseValidationError{
+					field:  "Cluster",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetCluster()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return CreateFleetManagedClusterResponseValidationError{
+				field:  "Cluster",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if all {
+		switch v := interface{}(m.GetValuesRender()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, CreateFleetManagedClusterResponseValidationError{
+					field:  "ValuesRender",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, CreateFleetManagedClusterResponseValidationError{
+					field:  "ValuesRender",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetValuesRender()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return CreateFleetManagedClusterResponseValidationError{
+				field:  "ValuesRender",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return CreateFleetManagedClusterResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// CreateFleetManagedClusterResponseMultiError is an error wrapping multiple
+// validation errors returned by
+// CreateFleetManagedClusterResponse.ValidateAll() if the designated
+// constraints aren't met.
+type CreateFleetManagedClusterResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m CreateFleetManagedClusterResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m CreateFleetManagedClusterResponseMultiError) AllErrors() []error { return m }
+
+// CreateFleetManagedClusterResponseValidationError is the validation error
+// returned by CreateFleetManagedClusterResponse.Validate if the designated
+// constraints aren't met.
+type CreateFleetManagedClusterResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e CreateFleetManagedClusterResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e CreateFleetManagedClusterResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e CreateFleetManagedClusterResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e CreateFleetManagedClusterResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e CreateFleetManagedClusterResponseValidationError) ErrorName() string {
+	return "CreateFleetManagedClusterResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e CreateFleetManagedClusterResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sCreateFleetManagedClusterResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = CreateFleetManagedClusterResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = CreateFleetManagedClusterResponseValidationError{}
+
 // Validate checks the field values on ManagedClusterServiceGetRequest with the
 // rules defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
@@ -1333,3 +1819,545 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = ManagedClusterServiceDeleteResponseValidationError{}
+
+// Validate checks the field values on SetNodeGroupsRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *SetNodeGroupsRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on SetNodeGroupsRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// SetNodeGroupsRequestMultiError, or nil if none found.
+func (m *SetNodeGroupsRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *SetNodeGroupsRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetId()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, SetNodeGroupsRequestValidationError{
+					field:  "Id",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, SetNodeGroupsRequestValidationError{
+					field:  "Id",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetId()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return SetNodeGroupsRequestValidationError{
+				field:  "Id",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	for idx, item := range m.GetNodeGroups() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, SetNodeGroupsRequestValidationError{
+						field:  fmt.Sprintf("NodeGroups[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, SetNodeGroupsRequestValidationError{
+						field:  fmt.Sprintf("NodeGroups[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return SetNodeGroupsRequestValidationError{
+					field:  fmt.Sprintf("NodeGroups[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	if m.ExpectedGeneration != nil {
+		// no validation rules for ExpectedGeneration
+	}
+
+	if len(errors) > 0 {
+		return SetNodeGroupsRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// SetNodeGroupsRequestMultiError is an error wrapping multiple validation
+// errors returned by SetNodeGroupsRequest.ValidateAll() if the designated
+// constraints aren't met.
+type SetNodeGroupsRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SetNodeGroupsRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SetNodeGroupsRequestMultiError) AllErrors() []error { return m }
+
+// SetNodeGroupsRequestValidationError is the validation error returned by
+// SetNodeGroupsRequest.Validate if the designated constraints aren't met.
+type SetNodeGroupsRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SetNodeGroupsRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SetNodeGroupsRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SetNodeGroupsRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SetNodeGroupsRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SetNodeGroupsRequestValidationError) ErrorName() string {
+	return "SetNodeGroupsRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e SetNodeGroupsRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSetNodeGroupsRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SetNodeGroupsRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SetNodeGroupsRequestValidationError{}
+
+// Validate checks the field values on SetNodeGroupsResponse with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *SetNodeGroupsResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on SetNodeGroupsResponse with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// SetNodeGroupsResponseMultiError, or nil if none found.
+func (m *SetNodeGroupsResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *SetNodeGroupsResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Generation
+
+	if len(errors) > 0 {
+		return SetNodeGroupsResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// SetNodeGroupsResponseMultiError is an error wrapping multiple validation
+// errors returned by SetNodeGroupsResponse.ValidateAll() if the designated
+// constraints aren't met.
+type SetNodeGroupsResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SetNodeGroupsResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SetNodeGroupsResponseMultiError) AllErrors() []error { return m }
+
+// SetNodeGroupsResponseValidationError is the validation error returned by
+// SetNodeGroupsResponse.Validate if the designated constraints aren't met.
+type SetNodeGroupsResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SetNodeGroupsResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SetNodeGroupsResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SetNodeGroupsResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SetNodeGroupsResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SetNodeGroupsResponseValidationError) ErrorName() string {
+	return "SetNodeGroupsResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e SetNodeGroupsResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSetNodeGroupsResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SetNodeGroupsResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SetNodeGroupsResponseValidationError{}
+
+// Validate checks the field values on GetNodeGroupsRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *GetNodeGroupsRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on GetNodeGroupsRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// GetNodeGroupsRequestMultiError, or nil if none found.
+func (m *GetNodeGroupsRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *GetNodeGroupsRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetId()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, GetNodeGroupsRequestValidationError{
+					field:  "Id",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, GetNodeGroupsRequestValidationError{
+					field:  "Id",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetId()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return GetNodeGroupsRequestValidationError{
+				field:  "Id",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return GetNodeGroupsRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// GetNodeGroupsRequestMultiError is an error wrapping multiple validation
+// errors returned by GetNodeGroupsRequest.ValidateAll() if the designated
+// constraints aren't met.
+type GetNodeGroupsRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m GetNodeGroupsRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m GetNodeGroupsRequestMultiError) AllErrors() []error { return m }
+
+// GetNodeGroupsRequestValidationError is the validation error returned by
+// GetNodeGroupsRequest.Validate if the designated constraints aren't met.
+type GetNodeGroupsRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e GetNodeGroupsRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e GetNodeGroupsRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e GetNodeGroupsRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e GetNodeGroupsRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e GetNodeGroupsRequestValidationError) ErrorName() string {
+	return "GetNodeGroupsRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e GetNodeGroupsRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sGetNodeGroupsRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = GetNodeGroupsRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = GetNodeGroupsRequestValidationError{}
+
+// Validate checks the field values on GetNodeGroupsResponse with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *GetNodeGroupsResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on GetNodeGroupsResponse with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// GetNodeGroupsResponseMultiError, or nil if none found.
+func (m *GetNodeGroupsResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *GetNodeGroupsResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	for idx, item := range m.GetNodeGroups() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, GetNodeGroupsResponseValidationError{
+						field:  fmt.Sprintf("NodeGroups[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, GetNodeGroupsResponseValidationError{
+						field:  fmt.Sprintf("NodeGroups[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return GetNodeGroupsResponseValidationError{
+					field:  fmt.Sprintf("NodeGroups[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	// no validation rules for Generation
+
+	if len(errors) > 0 {
+		return GetNodeGroupsResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// GetNodeGroupsResponseMultiError is an error wrapping multiple validation
+// errors returned by GetNodeGroupsResponse.ValidateAll() if the designated
+// constraints aren't met.
+type GetNodeGroupsResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m GetNodeGroupsResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m GetNodeGroupsResponseMultiError) AllErrors() []error { return m }
+
+// GetNodeGroupsResponseValidationError is the validation error returned by
+// GetNodeGroupsResponse.Validate if the designated constraints aren't met.
+type GetNodeGroupsResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e GetNodeGroupsResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e GetNodeGroupsResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e GetNodeGroupsResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e GetNodeGroupsResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e GetNodeGroupsResponseValidationError) ErrorName() string {
+	return "GetNodeGroupsResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e GetNodeGroupsResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sGetNodeGroupsResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = GetNodeGroupsResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = GetNodeGroupsResponseValidationError{}

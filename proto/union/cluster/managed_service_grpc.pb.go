@@ -19,11 +19,14 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	ManagedClusterService_Create_FullMethodName          = "/cloudidl.cluster.ManagedClusterService/Create"
-	ManagedClusterService_Get_FullMethodName             = "/cloudidl.cluster.ManagedClusterService/Get"
-	ManagedClusterService_List_FullMethodName            = "/cloudidl.cluster.ManagedClusterService/List"
-	ManagedClusterService_ListDisplayInfo_FullMethodName = "/cloudidl.cluster.ManagedClusterService/ListDisplayInfo"
-	ManagedClusterService_Delete_FullMethodName          = "/cloudidl.cluster.ManagedClusterService/Delete"
+	ManagedClusterService_Create_FullMethodName                    = "/cloudidl.cluster.ManagedClusterService/Create"
+	ManagedClusterService_CreateFleetManagedCluster_FullMethodName = "/cloudidl.cluster.ManagedClusterService/CreateFleetManagedCluster"
+	ManagedClusterService_SetNodeGroups_FullMethodName             = "/cloudidl.cluster.ManagedClusterService/SetNodeGroups"
+	ManagedClusterService_GetNodeGroups_FullMethodName             = "/cloudidl.cluster.ManagedClusterService/GetNodeGroups"
+	ManagedClusterService_Get_FullMethodName                       = "/cloudidl.cluster.ManagedClusterService/Get"
+	ManagedClusterService_List_FullMethodName                      = "/cloudidl.cluster.ManagedClusterService/List"
+	ManagedClusterService_ListDisplayInfo_FullMethodName           = "/cloudidl.cluster.ManagedClusterService/ListDisplayInfo"
+	ManagedClusterService_Delete_FullMethodName                    = "/cloudidl.cluster.ManagedClusterService/Delete"
 )
 
 // ManagedClusterServiceClient is the client API for ManagedClusterService service.
@@ -32,6 +35,51 @@ const (
 type ManagedClusterServiceClient interface {
 	// Create new unprovisioned managed cluster
 	Create(ctx context.Context, in *ManagedClusterServiceCreateRequest, opts ...grpc.CallOption) (*ManagedClusterServiceCreateResponse, error)
+	// Create a Fleet-managed cluster for the calling organization.
+	CreateFleetManagedCluster(ctx context.Context, in *CreateFleetManagedClusterRequest, opts ...grpc.CallOption) (*CreateFleetManagedClusterResponse, error)
+	// SetNodeGroups sets a cluster's node groups through the API, for example from the CLI. For a
+	// Union-provisioned cluster it is one of two entry points to the same node-group write.
+	// Provisioning uses the other one: the node groups it states travel on `Create`, which writes
+	// them in the same transaction as the cluster spec. Both entry points store the groups the same
+	// way and move the same change counter. For a customer-managed cluster it is the only entry
+	// point: `Create` drops any node groups it is sent for such a cluster and keeps the stored ones.
+	//
+	// Who may write here depends on who manages the cluster. A Union-provisioned (BYOC,
+	// `CLUSTER_TYPE_MANAGED_PLUS`) cluster's node groups are Union's: only the deployment's
+	// unionai-admin tenant may write them, and every other caller, the customer included, is
+	// refused with PermissionDenied. A cluster whose type was never recorded is treated the same
+	// way. A customer-managed cluster takes the write from its own organization (MANAGE_CLUSTER on
+	// the cluster) or from a Union admin. A conflict is rejected at the write rather than resolved by
+	// ranking sources at read time.
+	//
+	// For a Union-provisioned cluster, provisioning restates the node groups on its next `Create`,
+	// so the cluster's provisioning spec stays the source of truth: an API write lasts until the
+	// next provisioning run. A lasting change to such a cluster's node groups belongs in its spec,
+	// followed by a provisioning run.
+	//
+	// A customer-managed cluster's node groups are the customer's alone, so provisioning never
+	// overwrites them: a write here lasts until the next write here.
+	//
+	// With `expected_generation` set, a write against a cluster that has moved on is refused with
+	// Aborted; the caller should re-read with GetNodeGroups and retry.
+	//
+	// The REST path names the organization as well as the cluster. A two-segment
+	// `{id.name}/node_groups` shape would be ambiguous with `Get`'s
+	// `/managed_cluster/api/v1/{id.org.name}/{id.name}` binding — `/managed_cluster/api/v1/acme/
+	// node_groups` would match both, and which one won would depend on registration order — so the
+	// organization is in the path rather than left to the context. It is required on the identifier
+	// in any case.
+	SetNodeGroups(ctx context.Context, in *SetNodeGroupsRequest, opts ...grpc.CallOption) (*SetNodeGroupsResponse, error)
+	// GetNodeGroups reads a cluster's declared node groups back, without the console's filtering.
+	//
+	// ListDisplayInfo is the console's view and strips taints that are noise in a table; a caller
+	// editing the declaration needs what was stored. The generation is returned alongside so a
+	// read-modify-write can pass it to SetNodeGroups and be refused rather than clobber a concurrent
+	// edit. It is the stored counter, which every node-group write sets in the same statement as the
+	// groups; a cluster whose node groups have never been written reports 0, which asks for no check.
+	// Organization in the path, for the same reason as SetNodeGroups above: a two-segment shape
+	// collides with `Get`'s `{id.org.name}/{id.name}` binding.
+	GetNodeGroups(ctx context.Context, in *GetNodeGroupsRequest, opts ...grpc.CallOption) (*GetNodeGroupsResponse, error)
 	Get(ctx context.Context, in *ManagedClusterServiceGetRequest, opts ...grpc.CallOption) (*ManagedClusterServiceGetResponse, error)
 	List(ctx context.Context, in *ManagedClusterServiceListRequest, opts ...grpc.CallOption) (*ManagedClusterServiceListResponse, error)
 	ListDisplayInfo(ctx context.Context, in *ManagedClusterServiceListDisplayInfoRequest, opts ...grpc.CallOption) (*ManagedClusterServiceListDisplayInfoResponse, error)
@@ -50,6 +98,33 @@ func NewManagedClusterServiceClient(cc grpc.ClientConnInterface) ManagedClusterS
 func (c *managedClusterServiceClient) Create(ctx context.Context, in *ManagedClusterServiceCreateRequest, opts ...grpc.CallOption) (*ManagedClusterServiceCreateResponse, error) {
 	out := new(ManagedClusterServiceCreateResponse)
 	err := c.cc.Invoke(ctx, ManagedClusterService_Create_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *managedClusterServiceClient) CreateFleetManagedCluster(ctx context.Context, in *CreateFleetManagedClusterRequest, opts ...grpc.CallOption) (*CreateFleetManagedClusterResponse, error) {
+	out := new(CreateFleetManagedClusterResponse)
+	err := c.cc.Invoke(ctx, ManagedClusterService_CreateFleetManagedCluster_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *managedClusterServiceClient) SetNodeGroups(ctx context.Context, in *SetNodeGroupsRequest, opts ...grpc.CallOption) (*SetNodeGroupsResponse, error) {
+	out := new(SetNodeGroupsResponse)
+	err := c.cc.Invoke(ctx, ManagedClusterService_SetNodeGroups_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *managedClusterServiceClient) GetNodeGroups(ctx context.Context, in *GetNodeGroupsRequest, opts ...grpc.CallOption) (*GetNodeGroupsResponse, error) {
+	out := new(GetNodeGroupsResponse)
+	err := c.cc.Invoke(ctx, ManagedClusterService_GetNodeGroups_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -98,6 +173,51 @@ func (c *managedClusterServiceClient) Delete(ctx context.Context, in *ManagedClu
 type ManagedClusterServiceServer interface {
 	// Create new unprovisioned managed cluster
 	Create(context.Context, *ManagedClusterServiceCreateRequest) (*ManagedClusterServiceCreateResponse, error)
+	// Create a Fleet-managed cluster for the calling organization.
+	CreateFleetManagedCluster(context.Context, *CreateFleetManagedClusterRequest) (*CreateFleetManagedClusterResponse, error)
+	// SetNodeGroups sets a cluster's node groups through the API, for example from the CLI. For a
+	// Union-provisioned cluster it is one of two entry points to the same node-group write.
+	// Provisioning uses the other one: the node groups it states travel on `Create`, which writes
+	// them in the same transaction as the cluster spec. Both entry points store the groups the same
+	// way and move the same change counter. For a customer-managed cluster it is the only entry
+	// point: `Create` drops any node groups it is sent for such a cluster and keeps the stored ones.
+	//
+	// Who may write here depends on who manages the cluster. A Union-provisioned (BYOC,
+	// `CLUSTER_TYPE_MANAGED_PLUS`) cluster's node groups are Union's: only the deployment's
+	// unionai-admin tenant may write them, and every other caller, the customer included, is
+	// refused with PermissionDenied. A cluster whose type was never recorded is treated the same
+	// way. A customer-managed cluster takes the write from its own organization (MANAGE_CLUSTER on
+	// the cluster) or from a Union admin. A conflict is rejected at the write rather than resolved by
+	// ranking sources at read time.
+	//
+	// For a Union-provisioned cluster, provisioning restates the node groups on its next `Create`,
+	// so the cluster's provisioning spec stays the source of truth: an API write lasts until the
+	// next provisioning run. A lasting change to such a cluster's node groups belongs in its spec,
+	// followed by a provisioning run.
+	//
+	// A customer-managed cluster's node groups are the customer's alone, so provisioning never
+	// overwrites them: a write here lasts until the next write here.
+	//
+	// With `expected_generation` set, a write against a cluster that has moved on is refused with
+	// Aborted; the caller should re-read with GetNodeGroups and retry.
+	//
+	// The REST path names the organization as well as the cluster. A two-segment
+	// `{id.name}/node_groups` shape would be ambiguous with `Get`'s
+	// `/managed_cluster/api/v1/{id.org.name}/{id.name}` binding — `/managed_cluster/api/v1/acme/
+	// node_groups` would match both, and which one won would depend on registration order — so the
+	// organization is in the path rather than left to the context. It is required on the identifier
+	// in any case.
+	SetNodeGroups(context.Context, *SetNodeGroupsRequest) (*SetNodeGroupsResponse, error)
+	// GetNodeGroups reads a cluster's declared node groups back, without the console's filtering.
+	//
+	// ListDisplayInfo is the console's view and strips taints that are noise in a table; a caller
+	// editing the declaration needs what was stored. The generation is returned alongside so a
+	// read-modify-write can pass it to SetNodeGroups and be refused rather than clobber a concurrent
+	// edit. It is the stored counter, which every node-group write sets in the same statement as the
+	// groups; a cluster whose node groups have never been written reports 0, which asks for no check.
+	// Organization in the path, for the same reason as SetNodeGroups above: a two-segment shape
+	// collides with `Get`'s `{id.org.name}/{id.name}` binding.
+	GetNodeGroups(context.Context, *GetNodeGroupsRequest) (*GetNodeGroupsResponse, error)
 	Get(context.Context, *ManagedClusterServiceGetRequest) (*ManagedClusterServiceGetResponse, error)
 	List(context.Context, *ManagedClusterServiceListRequest) (*ManagedClusterServiceListResponse, error)
 	ListDisplayInfo(context.Context, *ManagedClusterServiceListDisplayInfoRequest) (*ManagedClusterServiceListDisplayInfoResponse, error)
@@ -111,6 +231,15 @@ type UnimplementedManagedClusterServiceServer struct {
 
 func (UnimplementedManagedClusterServiceServer) Create(context.Context, *ManagedClusterServiceCreateRequest) (*ManagedClusterServiceCreateResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Create not implemented")
+}
+func (UnimplementedManagedClusterServiceServer) CreateFleetManagedCluster(context.Context, *CreateFleetManagedClusterRequest) (*CreateFleetManagedClusterResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateFleetManagedCluster not implemented")
+}
+func (UnimplementedManagedClusterServiceServer) SetNodeGroups(context.Context, *SetNodeGroupsRequest) (*SetNodeGroupsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetNodeGroups not implemented")
+}
+func (UnimplementedManagedClusterServiceServer) GetNodeGroups(context.Context, *GetNodeGroupsRequest) (*GetNodeGroupsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetNodeGroups not implemented")
 }
 func (UnimplementedManagedClusterServiceServer) Get(context.Context, *ManagedClusterServiceGetRequest) (*ManagedClusterServiceGetResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Get not implemented")
@@ -150,6 +279,60 @@ func _ManagedClusterService_Create_Handler(srv interface{}, ctx context.Context,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ManagedClusterServiceServer).Create(ctx, req.(*ManagedClusterServiceCreateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ManagedClusterService_CreateFleetManagedCluster_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateFleetManagedClusterRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ManagedClusterServiceServer).CreateFleetManagedCluster(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ManagedClusterService_CreateFleetManagedCluster_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ManagedClusterServiceServer).CreateFleetManagedCluster(ctx, req.(*CreateFleetManagedClusterRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ManagedClusterService_SetNodeGroups_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetNodeGroupsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ManagedClusterServiceServer).SetNodeGroups(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ManagedClusterService_SetNodeGroups_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ManagedClusterServiceServer).SetNodeGroups(ctx, req.(*SetNodeGroupsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ManagedClusterService_GetNodeGroups_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetNodeGroupsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ManagedClusterServiceServer).GetNodeGroups(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ManagedClusterService_GetNodeGroups_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ManagedClusterServiceServer).GetNodeGroups(ctx, req.(*GetNodeGroupsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -236,6 +419,18 @@ var ManagedClusterService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Create",
 			Handler:    _ManagedClusterService_Create_Handler,
+		},
+		{
+			MethodName: "CreateFleetManagedCluster",
+			Handler:    _ManagedClusterService_CreateFleetManagedCluster_Handler,
+		},
+		{
+			MethodName: "SetNodeGroups",
+			Handler:    _ManagedClusterService_SetNodeGroups_Handler,
+		},
+		{
+			MethodName: "GetNodeGroups",
+			Handler:    _ManagedClusterService_GetNodeGroups_Handler,
 		},
 		{
 			MethodName: "Get",

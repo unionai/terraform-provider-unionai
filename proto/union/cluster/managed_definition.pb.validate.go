@@ -39,110 +39,6 @@ var (
 	_ = core.Resources_ResourceName(0)
 )
 
-// Validate checks the field values on Taint with the rules defined in the
-// proto definition for this message. If any rules are violated, the first
-// error encountered is returned, or nil if there are no violations.
-func (m *Taint) Validate() error {
-	return m.validate(false)
-}
-
-// ValidateAll checks the field values on Taint with the rules defined in the
-// proto definition for this message. If any rules are violated, the result is
-// a list of violation errors wrapped in TaintMultiError, or nil if none found.
-func (m *Taint) ValidateAll() error {
-	return m.validate(true)
-}
-
-func (m *Taint) validate(all bool) error {
-	if m == nil {
-		return nil
-	}
-
-	var errors []error
-
-	// no validation rules for Key
-
-	// no validation rules for Value
-
-	// no validation rules for Effect
-
-	if len(errors) > 0 {
-		return TaintMultiError(errors)
-	}
-
-	return nil
-}
-
-// TaintMultiError is an error wrapping multiple validation errors returned by
-// Taint.ValidateAll() if the designated constraints aren't met.
-type TaintMultiError []error
-
-// Error returns a concatenation of all the error messages it wraps.
-func (m TaintMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
-	for _, err := range m {
-		msgs = append(msgs, err.Error())
-	}
-	return strings.Join(msgs, "; ")
-}
-
-// AllErrors returns a list of validation violation errors.
-func (m TaintMultiError) AllErrors() []error { return m }
-
-// TaintValidationError is the validation error returned by Taint.Validate if
-// the designated constraints aren't met.
-type TaintValidationError struct {
-	field  string
-	reason string
-	cause  error
-	key    bool
-}
-
-// Field function returns field value.
-func (e TaintValidationError) Field() string { return e.field }
-
-// Reason function returns reason value.
-func (e TaintValidationError) Reason() string { return e.reason }
-
-// Cause function returns cause value.
-func (e TaintValidationError) Cause() error { return e.cause }
-
-// Key function returns key value.
-func (e TaintValidationError) Key() bool { return e.key }
-
-// ErrorName returns error name.
-func (e TaintValidationError) ErrorName() string { return "TaintValidationError" }
-
-// Error satisfies the builtin error interface
-func (e TaintValidationError) Error() string {
-	cause := ""
-	if e.cause != nil {
-		cause = fmt.Sprintf(" | caused by: %v", e.cause)
-	}
-
-	key := ""
-	if e.key {
-		key = "key for "
-	}
-
-	return fmt.Sprintf(
-		"invalid %sTaint.%s: %s%s",
-		key,
-		e.field,
-		e.reason,
-		cause)
-}
-
-var _ error = TaintValidationError{}
-
-var _ interface {
-	Field() string
-	Reason() string
-	Key() bool
-	Cause() error
-	ErrorName() string
-} = TaintValidationError{}
-
 // Validate checks the field values on NodeGroup with the rules defined in the
 // proto definition for this message. If any rules are violated, the first
 // error encountered is returned, or nil if there are no violations.
@@ -274,6 +170,50 @@ func (m *NodeGroup) validate(all bool) error {
 		}
 	}
 
+	for idx, item := range m.GetAccelerators() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, NodeGroupValidationError{
+						field:  fmt.Sprintf("Accelerators[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, NodeGroupValidationError{
+						field:  fmt.Sprintf("Accelerators[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return NodeGroupValidationError{
+					field:  fmt.Sprintf("Accelerators[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	// no validation rules for Architecture
+
+	// no validation rules for MaxPods
+
+	// no validation rules for Limits
+
+	if m.Weight != nil {
+		// no validation rules for Weight
+	}
+
 	if len(errors) > 0 {
 		return NodeGroupMultiError(errors)
 	}
@@ -350,6 +290,116 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = NodeGroupValidationError{}
+
+// Validate checks the field values on NodeGroupAccelerator with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *NodeGroupAccelerator) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on NodeGroupAccelerator with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// NodeGroupAcceleratorMultiError, or nil if none found.
+func (m *NodeGroupAccelerator) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *NodeGroupAccelerator) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Device
+
+	// no validation rules for Manufacturer
+
+	// no validation rules for Count
+
+	// no validation rules for PartitionSize
+
+	if len(errors) > 0 {
+		return NodeGroupAcceleratorMultiError(errors)
+	}
+
+	return nil
+}
+
+// NodeGroupAcceleratorMultiError is an error wrapping multiple validation
+// errors returned by NodeGroupAccelerator.ValidateAll() if the designated
+// constraints aren't met.
+type NodeGroupAcceleratorMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m NodeGroupAcceleratorMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m NodeGroupAcceleratorMultiError) AllErrors() []error { return m }
+
+// NodeGroupAcceleratorValidationError is the validation error returned by
+// NodeGroupAccelerator.Validate if the designated constraints aren't met.
+type NodeGroupAcceleratorValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e NodeGroupAcceleratorValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e NodeGroupAcceleratorValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e NodeGroupAcceleratorValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e NodeGroupAcceleratorValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e NodeGroupAcceleratorValidationError) ErrorName() string {
+	return "NodeGroupAcceleratorValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e NodeGroupAcceleratorValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sNodeGroupAccelerator.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = NodeGroupAcceleratorValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = NodeGroupAcceleratorValidationError{}
 
 // Validate checks the field values on ManagedClusterInfo with the rules
 // defined in the proto definition for this message. If any rules are
@@ -439,6 +489,155 @@ func (m *ManagedClusterInfo) validate(all bool) error {
 	// no validation rules for Type
 
 	// no validation rules for CloudType
+
+	if all {
+		switch v := interface{}(m.GetAws()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, ManagedClusterInfoValidationError{
+					field:  "Aws",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, ManagedClusterInfoValidationError{
+					field:  "Aws",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetAws()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return ManagedClusterInfoValidationError{
+				field:  "Aws",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	// no validation rules for CredentialsSecretRef
+
+	if all {
+		switch v := interface{}(m.GetGcp()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, ManagedClusterInfoValidationError{
+					field:  "Gcp",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, ManagedClusterInfoValidationError{
+					field:  "Gcp",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetGcp()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return ManagedClusterInfoValidationError{
+				field:  "Gcp",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if all {
+		switch v := interface{}(m.GetAzure()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, ManagedClusterInfoValidationError{
+					field:  "Azure",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, ManagedClusterInfoValidationError{
+					field:  "Azure",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetAzure()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return ManagedClusterInfoValidationError{
+				field:  "Azure",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if all {
+		switch v := interface{}(m.GetMetal()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, ManagedClusterInfoValidationError{
+					field:  "Metal",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, ManagedClusterInfoValidationError{
+					field:  "Metal",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetMetal()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return ManagedClusterInfoValidationError{
+				field:  "Metal",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if all {
+		switch v := interface{}(m.GetOci()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, ManagedClusterInfoValidationError{
+					field:  "Oci",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, ManagedClusterInfoValidationError{
+					field:  "Oci",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetOci()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return ManagedClusterInfoValidationError{
+				field:  "Oci",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	// no validation rules for Namespace
 
 	if len(errors) > 0 {
 		return ManagedClusterInfoMultiError(errors)
@@ -603,6 +802,35 @@ func (m *ManagedCluster) validate(all bool) error {
 			}
 		}
 
+	}
+
+	if all {
+		switch v := interface{}(m.GetPool()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, ManagedClusterValidationError{
+					field:  "Pool",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, ManagedClusterValidationError{
+					field:  "Pool",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetPool()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return ManagedClusterValidationError{
+				field:  "Pool",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
 	}
 
 	if len(errors) > 0 {
