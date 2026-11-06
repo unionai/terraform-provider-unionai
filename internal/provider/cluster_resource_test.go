@@ -36,6 +36,8 @@ type fakeClusterServer struct {
 	// queues holds names taken in the queue namespace by queues that are not cluster-owned.
 	queues map[string]bool
 	pools  map[string]bool
+	// getFailures makes the next GetCluster calls fail with Unavailable.
+	getFailures int
 }
 
 type fakeClusterRecord struct {
@@ -81,6 +83,10 @@ func (s *fakeClusterServer) toProto(id *common.ClusterIdentifier, record *fakeCl
 func (s *fakeClusterServer) GetCluster(ctx context.Context, req *cluster.GetRequest) (*cluster.GetResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.getFailures > 0 {
+		s.getFailures--
+		return nil, status.Error(codes.Unavailable, "control plane unavailable")
+	}
 	record, err := s.live(req.GetClusterId())
 	if err != nil {
 		return nil, err
@@ -395,4 +401,72 @@ resource "unionai_cluster" "test" {
 	if record := fake.record("other/prod"); record != nil {
 		t.Errorf("other/prod was created despite allowed_orgs: %+v", record)
 	}
+}
+
+// An explicit empty pool is rejected at plan time instead of producing an inconsistent result.
+func TestClusterResource_EmptyPool(t *testing.T) {
+	_, factories := newClusterTestServer(t)
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories,
+		Steps: []resource.TestStep{
+			{
+				Config: `
+resource "unionai_cluster" "test" {
+  name              = "prod"
+  cluster_pool_name = ""
+}
+`,
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`Empty cluster pool name`),
+			},
+		},
+	})
+}
+
+// The suggested import ID names the organization when it differs from the provider's.
+func TestClusterResource_AlreadyExistsOtherOrg(t *testing.T) {
+	fake, factories := newClusterTestServer(t)
+	fake.clusters["other/prod"] = &fakeClusterRecord{pool: "default", state: cluster.ClusterState_CLUSTER_STATE_ACTIVE, generation: 1}
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories,
+		Steps: []resource.TestStep{
+			{
+				Config: `
+resource "unionai_cluster" "test" {
+  org  = "other"
+  name = "prod"
+}
+`,
+				ExpectError: regexp.MustCompile(`terraform import unionai_cluster.example other/prod`),
+			},
+		},
+	})
+}
+
+// A failed read-back after create keeps the cluster in state, so the next apply refreshes it
+// instead of trying to create it again.
+func TestClusterResource_ReadBackFailsAfterCreate(t *testing.T) {
+	fake, factories := newClusterTestServer(t)
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories,
+		Steps: []resource.TestStep{
+			{
+				PreConfig: func() { fake.getFailures = 1 },
+				Config:    clusterConfig("prod", ""),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("unionai_cluster.test", "id", "acme/prod"),
+					resource.TestCheckResourceAttr("unionai_cluster.test", "cluster_pool_name", "default"),
+				),
+			},
+			{
+				Config: clusterConfig("prod", ""),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("unionai_cluster.test", "state", "active"),
+				),
+			},
+		},
+	})
 }

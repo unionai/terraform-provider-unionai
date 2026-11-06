@@ -132,6 +132,15 @@ func (r *ClusterResource) ValidateConfig(ctx context.Context, req resource.Valid
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	// An explicit empty pool would be sent as-is, and the server would read it back as
+	// `default`, an inconsistent result after apply. Omitting the attribute selects `default`.
+	if !data.ClusterPoolName.IsNull() && !data.ClusterPoolName.IsUnknown() && data.ClusterPoolName.ValueString() == "" {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("cluster_pool_name"),
+			"Empty cluster pool name",
+			fmt.Sprintf("cluster_pool_name cannot be empty. Omit it to use the %q pool.", defaultClusterPoolName),
+		)
+	}
 	if data.Name.ValueString() == reservedClusterName {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("name"),
@@ -169,6 +178,10 @@ func (r *ClusterResource) Create(ctx context.Context, req resource.CreateRequest
 	})
 	if _, err := r.conn.CreateCluster(ctx, createRequest); err != nil {
 		if status.Code(err) == codes.AlreadyExists {
+			importID := name
+			if org != r.org {
+				importID = org + "/" + name
+			}
 			resp.Diagnostics.AddError(
 				"Cluster already exists",
 				fmt.Sprintf(
@@ -177,7 +190,7 @@ func (r *ClusterResource) Create(ctx context.Context, req resource.CreateRequest
 						"If it is this cluster (for example one registered with `flyte create cluster`), import it instead:\n\n"+
 						"  terraform import unionai_cluster.example %s\n\n"+
 						"A soft-deleted cluster keeps its name reserved and cannot be imported until it is undeleted.\n\n%s",
-					name, org, name, err,
+					name, org, importID, err,
 				),
 			)
 			return
@@ -189,7 +202,17 @@ func (r *ClusterResource) Create(ctx context.Context, req resource.CreateRequest
 	// CreateCluster returns nothing, so read the record back for the computed attributes.
 	got, err := r.conn.GetCluster(ctx, &cluster.GetRequest{ClusterId: clusterId(org, name)})
 	if err != nil {
-		resp.Diagnostics.Append(clusterError("read", org, name, err))
+		// The cluster exists now. Save what is known so the next apply refreshes it rather
+		// than creating it again and failing with "already exists".
+		data.Id = types.StringValue(org + "/" + name)
+		data.Org = types.StringValue(org)
+		data.State = types.StringNull()
+		resp.Diagnostics.AddWarning(
+			"Cluster created, but reading it back failed",
+			fmt.Sprintf("Cluster %q in organization %q was created, but reading it back failed: %s\n\n"+
+				"It is saved in state; the next plan or refresh fills in its remaining attributes.", name, org, err),
+		)
+		resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 		return
 	}
 	applyClusterToModel(&data, org, name, got.GetCluster())
