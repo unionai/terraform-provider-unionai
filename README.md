@@ -71,6 +71,7 @@ operations on resources in the allowed organizations.
 - `unionai_application_access` - Assign policies to applications
 - `unionai_queue` - Manage queues (concurrency, priority, fairness, cluster routing)
 - `unionai_node_groups` - Manage the node groups declared on a customer-managed cluster
+- `unionai_cluster` - Register a dataplane cluster with the control plane
 
 ## Available Data Sources
 

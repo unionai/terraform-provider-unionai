@@ -151,6 +151,7 @@ func (p *UnionaiProvider) Resources(ctx context.Context) []func() resource.Resou
 		NewProjectDomainAttributesResource,
 		NewQueueResource,
 		NewNodeGroupsResource,
+		NewClusterResource,
 	}
 }
 
