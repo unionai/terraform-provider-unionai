@@ -37,8 +37,6 @@ type QueueDataSourceModel struct {
 	Depth             types.Int64  `tfsdk:"depth"`
 	Priority          types.String `tfsdk:"priority"`
 	Fairness          types.String `tfsdk:"fairness"`
-	Scheduling        types.String `tfsdk:"scheduling"`
-	MaxResources      types.Map    `tfsdk:"max_resources"`
 	State             types.String `tfsdk:"state"`
 	ClusterManaged    types.Bool   `tfsdk:"cluster_managed"`
 	AvailableClusters types.Set    `tfsdk:"available_clusters"`
@@ -89,15 +87,6 @@ func (d *QueueDataSource) Schema(ctx context.Context, req datasource.SchemaReque
 			"fairness": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "Cross-project scheduling policy within this queue: `round_robin` or `shuffle_interleave`.",
-			},
-			"scheduling": schema.StringAttribute{
-				Computed:            true,
-				MarkdownDescription: "Scheduling policy used when an action does not fit the queue's remaining resource caps: `default`, `strict_fifo`, or `greedy_capacity`.",
-			},
-			"max_resources": schema.MapAttribute{
-				Computed:            true,
-				ElementType:         types.StringType,
-				MarkdownDescription: "Per-resource caps on the total requests of this queue's in-flight actions. Supported keys are `cpu`, `memory`, and `ephemeral_storage`; values are Kubernetes quantities. GPUs are not included.",
 			},
 			"state": schema.StringAttribute{
 				Computed:            true,
@@ -184,10 +173,6 @@ func (d *QueueDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 	data.Depth = types.Int64Value(int64(spec.GetDepth()))
 	data.Priority = queuePriorityToTerraform(spec.GetPriority())
 	data.Fairness = queueFairnessToTerraform(spec.GetFairness())
-	data.Scheduling = queueSchedulingToTerraform(spec.GetScheduling())
-	maxResources, mapDiags := queueMaxResourcesToTerraform(ctx, spec.GetMaxResources())
-	resp.Diagnostics.Append(mapDiags...)
-	data.MaxResources = maxResources
 	data.State = queueStateToTerraform(q.GetStatus().GetState())
 	data.ClusterManaged = types.BoolValue(q.GetStatus().GetClusterManaged())
 	data.AvailableClusters = convertArrayToSetGetter(
