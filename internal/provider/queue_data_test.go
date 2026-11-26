@@ -30,7 +30,7 @@ func TestQueueDataSource_Schema(t *testing.T) {
 
 	for _, attr := range []string{
 		"id", "cluster_pool_name", "clusters", "run_concurrency", "action_concurrency",
-		"depth", "priority", "fairness", "state", "cluster_managed", "available_clusters",
+		"depth", "priority", "fairness", "scheduling", "max_resources", "state", "cluster_managed", "available_clusters",
 		"created_at", "updated_at", "deleted_at",
 	} {
 		if _, ok := s.Schema.Attributes[attr]; !ok {
@@ -121,6 +121,8 @@ func queueDataSourceObjectType() tftypes.Object {
 			"depth":              tftypes.Number,
 			"priority":           tftypes.String,
 			"fairness":           tftypes.String,
+			"scheduling":         tftypes.String,
+			"max_resources":      tftypes.Map{ElementType: tftypes.String},
 			"state":              tftypes.String,
 			"cluster_managed":    tftypes.Bool,
 			"available_clusters": tftypes.Set{ElementType: tftypes.String},
@@ -134,6 +136,7 @@ func queueDataSourceObjectType() tftypes.Object {
 func newQueueDataSourceConfig(t *testing.T, name string) tfsdk.Config {
 	t.Helper()
 	nullSet := tftypes.NewValue(tftypes.Set{ElementType: tftypes.String}, nil)
+	nullMap := tftypes.NewValue(tftypes.Map{ElementType: tftypes.String}, nil)
 	return tfsdk.Config{
 		Schema: queueDataSourceSchema(t).Schema,
 		Raw: tftypes.NewValue(queueDataSourceObjectType(), map[string]tftypes.Value{
@@ -145,6 +148,8 @@ func newQueueDataSourceConfig(t *testing.T, name string) tfsdk.Config {
 			"depth":              tftypes.NewValue(tftypes.Number, nil),
 			"priority":           tftypes.NewValue(tftypes.String, nil),
 			"fairness":           tftypes.NewValue(tftypes.String, nil),
+			"scheduling":         tftypes.NewValue(tftypes.String, nil),
+			"max_resources":      nullMap,
 			"state":              tftypes.NewValue(tftypes.String, nil),
 			"cluster_managed":    tftypes.NewValue(tftypes.Bool, nil),
 			"available_clusters": nullSet,

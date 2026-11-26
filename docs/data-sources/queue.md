@@ -40,6 +40,8 @@ output "batch_queue_clusters" {
 - `depth` (Number) Maximum total items the queue can hold, in-progress plus waiting. `0` means unlimited.
 - `priority` (String) Scheduling priority relative to other queues: `min`, `medium`, or `max`.
 - `fairness` (String) Cross-project scheduling policy within this queue: `round_robin` or `shuffle_interleave`.
+- `scheduling` (String) Policy for scheduling actions that do not fit the queue's resource caps: `default`, `strict_fifo`, or `greedy_capacity`.
+- `max_resources` (Map of String) Caps the sum of resource requests from this queue's in-flight actions. Keys are `cpu`, `memory`, and `ephemeral_storage`; values are Kubernetes quantities. GPUs are not included in this map.
 - `state` (String) Queue lifecycle state: `active`, `draining`, or `drained`.
 - `cluster_managed` (Boolean) Whether this queue is the implicit queue owned by a cluster with the same name.
 - `available_clusters` (Set of String) Names of the clusters this queue can currently route to, after filtering down to those that are active and healthy.

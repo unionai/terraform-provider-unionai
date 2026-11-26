@@ -89,6 +89,26 @@ func queueSchedulingToTerraform(s queue.SchedulingAlgorithm) types.String {
 	return enumToTerraform(queue.SchedulingAlgorithm_name[int32(s)], schedulingPrefix)
 }
 
+func queueMaxResourcesToTerraform(ctx context.Context, entries []*core.Resources_ResourceEntry) (types.Map, diag.Diagnostics) {
+	resources := make(map[string]string, len(entries))
+	for _, entry := range entries {
+		var name string
+		switch entry.GetName() {
+		case core.Resources_CPU:
+			name = "cpu"
+		case core.Resources_MEMORY:
+			name = "memory"
+		case core.Resources_EPHEMERAL_STORAGE:
+			name = "ephemeral_storage"
+		default:
+			// Unknown resource names are ignored by the UI as well; GPUs are separately capped.
+			continue
+		}
+		resources[name] = entry.GetValue()
+	}
+	return types.MapValueFrom(ctx, types.StringType, resources)
+}
+
 func queueStateToTerraform(s queue.QueueState) types.String {
 	return enumToTerraform(queue.QueueState_name[int32(s)], statePrefix)
 }
