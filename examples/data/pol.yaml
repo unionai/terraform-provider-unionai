@@ -1,5 +1,0 @@
-name: jantesttf
-bindings:
-  - role: viewer
-    resource:
-      workflow: basics.workflow.simple_wf
