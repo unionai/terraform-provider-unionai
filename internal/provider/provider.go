@@ -149,6 +149,8 @@ func (p *UnionaiProvider) Resources(ctx context.Context) []func() resource.Resou
 		NewAppAccessResource,
 		NewTaskEnvironmentResource,
 		NewProjectDomainAttributesResource,
+		NewSettingsOverrideResource,
+		NewClusterConfigurationResource,
 		NewQueueResource,
 		NewNodeGroupsResource,
 	}
