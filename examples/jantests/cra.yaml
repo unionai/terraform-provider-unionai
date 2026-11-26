@@ -1,0 +1,5 @@
+attributes:
+  more: attributes
+  one: three
+domain: development
+project: jan-terraform-provider-tests

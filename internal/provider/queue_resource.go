@@ -46,6 +46,8 @@ type QueueResourceModel struct {
 	Depth             types.Int64  `tfsdk:"depth"`
 	Priority          types.String `tfsdk:"priority"`
 	Fairness          types.String `tfsdk:"fairness"`
+	Scheduling        types.String `tfsdk:"scheduling"`
+	MaxResources      types.Map    `tfsdk:"max_resources"`
 	Drain             types.Bool   `tfsdk:"drain"`
 	State             types.String `tfsdk:"state"`
 	ClusterManaged    types.Bool   `tfsdk:"cluster_managed"`
@@ -119,6 +121,18 @@ func (r *QueueResource) Schema(ctx context.Context, req resource.SchemaRequest, 
 				Computed:            true,
 				Default:             stringdefault.StaticString("round_robin"),
 				MarkdownDescription: "Cross-project scheduling policy within this queue: `round_robin` or `shuffle_interleave`. The unit of fairness is per-project.",
+			},
+			"scheduling": schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				Default:             stringdefault.StaticString("default"),
+				MarkdownDescription: "Scheduling policy used when an action does not fit the queue's remaining resource caps: `default`, `strict_fifo`, or `greedy_capacity`. `default` keeps the configured fairness order and skips actions that do not fit; `strict_fifo` holds the queue behind the first action that does not fit; `greedy_capacity` skips non-fitting actions and continues dispatching later actions.",
+			},
+			"max_resources": schema.MapAttribute{
+				Optional:            true,
+				Computed:            true,
+				ElementType:         types.StringType,
+				MarkdownDescription: "Per-resource caps on the total requests of this queue's in-flight actions. Supported keys are `cpu`, `memory`, and `ephemeral_storage`; values use Kubernetes quantity syntax such as `64`, `1500m`, or `512Gi`. Omit a key to leave that resource unlimited. GPUs are not accepted here.",
 			},
 			"drain": schema.BoolAttribute{
 				Optional:            true,

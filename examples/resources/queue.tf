@@ -8,6 +8,13 @@ resource "unionai_queue" "example" {
 
   priority = "medium"
   fairness = "round_robin"
+
+  max_resources = {
+    cpu               = "16"
+    memory            = "64Gi"
+    ephemeral_storage = "1Ti"
+  }
+  scheduling = "strict_fifo"
 }
 
 output "queue_batch" {
