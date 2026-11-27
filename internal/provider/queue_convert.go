@@ -55,14 +55,16 @@ func queueFairnessFromString(s string) (queue.FairnessAlgorithm, bool) {
 }
 
 func queueSchedulingFromString(s string) (queue.SchedulingAlgorithm, bool) {
-	if s == "default" {
+	switch s {
+	case "default":
 		return queue.SchedulingAlgorithm_SCHEDULING_ALGORITHM_UNSPECIFIED, true
-	}
-	v, ok := queue.SchedulingAlgorithm_value[schedulingPrefix+strings.ToUpper(s)]
-	if !ok {
+	case "strict_fifo":
+		return queue.SchedulingAlgorithm_SCHEDULING_ALGORITHM_STRICT_FIFO, true
+	case "greedy_capacity":
+		return queue.SchedulingAlgorithm_SCHEDULING_ALGORITHM_GREEDY_CAPACITY, true
+	default:
 		return queue.SchedulingAlgorithm_SCHEDULING_ALGORITHM_UNSPECIFIED, false
 	}
-	return queue.SchedulingAlgorithm(v), true
 }
 
 // enumToTerraform strips the given prefix and lowercases an enum name. Unspecified and

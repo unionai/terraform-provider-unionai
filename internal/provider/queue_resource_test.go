@@ -692,6 +692,31 @@ func TestQueueEnumRoundTrip(t *testing.T) {
 	}
 }
 
+func TestQueueSchedulingValuesAreCanonical(t *testing.T) {
+	for _, tc := range []struct {
+		in  string
+		out queue.SchedulingAlgorithm
+	}{
+		{"default", queue.SchedulingAlgorithm_SCHEDULING_ALGORITHM_UNSPECIFIED},
+		{"strict_fifo", queue.SchedulingAlgorithm_SCHEDULING_ALGORITHM_STRICT_FIFO},
+		{"greedy_capacity", queue.SchedulingAlgorithm_SCHEDULING_ALGORITHM_GREEDY_CAPACITY},
+	} {
+		got, ok := queueSchedulingFromString(tc.in)
+		if !ok || got != tc.out {
+			t.Errorf("queueSchedulingFromString(%q) = %v, %v", tc.in, got, ok)
+		}
+		if back := queueSchedulingToTerraform(got); back.ValueString() != tc.in {
+			t.Errorf("round trip for %q produced %q", tc.in, back.ValueString())
+		}
+	}
+
+	for _, invalid := range []string{"unspecified", "STRICT_FIFO", "GREEDY_CAPACITY", "DEFAULT", "Strict_Fifo"} {
+		if got, ok := queueSchedulingFromString(invalid); ok {
+			t.Errorf("queueSchedulingFromString(%q) unexpectedly accepted %v", invalid, got)
+		}
+	}
+}
+
 // --- helpers -------------------------------------------------------------
 
 func queueSchema(t *testing.T) resource.SchemaResponse {
