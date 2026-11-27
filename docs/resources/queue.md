@@ -7,7 +7,7 @@ description: |-
 
 # unionai_queue (Resource)
 
-Manages a Union.ai queue. Queues control admission and scheduling of runs: how many runs and actions may be in flight, how deep the backlog may get, scheduling priority relative to other queues, how work from different projects is interleaved, and which clusters within a cluster pool the work is routed to.
+Manages a Union.ai queue. Queues control admission and scheduling of runs: how many runs and actions may be in flight, how deep the backlog may get, scheduling priority relative to other queues, how work from different projects is interleaved, resource caps and the scheduling policy used when an action does not fit those caps, and which clusters within a cluster pool the work is routed to.
 
 Queues are organization-scoped — a queue name is unique within the organization and is not qualified by project or domain.
 
@@ -66,6 +66,16 @@ resource "unionai_queue" "production" {
 
   priority = "max"
   fairness = "shuffle_interleave"
+
+  # Cap total in-flight action requests for these dimensions.
+  max_resources = {
+    cpu                = "64"
+    memory             = "512Gi"
+    ephemeral_storage  = "1Ti"
+  }
+
+  # Choose how the queue handles actions that do not fit the remaining caps.
+  scheduling = "strict_fifo"
 }
 ```
 
@@ -84,7 +94,17 @@ resource "unionai_queue" "production" {
 - `depth` (Number) Maximum total items the queue can hold, in-progress plus waiting. `0` (the default) means unlimited.
 - `priority` (String) Scheduling priority relative to other queues: `min`, `medium` (the default), or `max`. Scheduling is strict — `max` always runs before `medium`, which always runs before `min`.
 - `fairness` (String) Cross-project scheduling policy within this queue: `round_robin` (the default) or `shuffle_interleave`. The unit of fairness is per-project.
+- `scheduling` (String) Policy for scheduling actions that do not fit the remaining `max_resources` caps: `default` (the default), `strict_fifo`, or `greedy_capacity`. `default` follows the fairness order and skips actions that do not fit; `strict_fifo` visits actions in enqueue order and blocks later actions behind the first one that does not fit; `greedy_capacity` visits actions in enqueue order and continues past actions that do not fit.
+- `max_resources` (Map of String) Caps the sum of resource requests from this queue's in-flight actions. Supported keys are `cpu`, `memory`, and `ephemeral_storage`; values are Kubernetes quantities such as `64`, `1500m`, `512Gi`, or `1Ti`. If the entire attribute is omitted, existing caps are preserved; a newly created queue starts without caps. Set `max_resources = {}` to clear all caps. When a map is provided, any omitted key is unlimited. GPUs are not supported in this map; queue resource caps in the UI also apply to CPU, memory, and ephemeral storage.
+
+For example, to remove all caps from an existing queue, configure:
+
+```terraform
+max_resources = {}
+```
 - `drain` (Boolean) When true, request that the queue stop accepting new work and drain existing work. Use this before destroying a queue. Defaults to `false`.
+
+Resource caps and scheduling behavior are enforced by the `v2` and `v3` scheduler strategies. With the default `v1` strategy, the configured cap is recorded but does not change scheduling decisions.
 
 ### Read-Only
 

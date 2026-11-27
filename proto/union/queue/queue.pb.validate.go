@@ -95,6 +95,42 @@ func (m *QueueStatus) validate(all bool) error {
 
 	// no validation rules for ClusterManaged
 
+	// no validation rules for StateGeneration
+
+	for idx, item := range m.GetEntitlementExclusions() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, QueueStatusValidationError{
+						field:  fmt.Sprintf("EntitlementExclusions[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, QueueStatusValidationError{
+						field:  fmt.Sprintf("EntitlementExclusions[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return QueueStatusValidationError{
+					field:  fmt.Sprintf("EntitlementExclusions[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
 	if len(errors) > 0 {
 		return QueueStatusMultiError(errors)
 	}
@@ -171,6 +207,112 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = QueueStatusValidationError{}
+
+// Validate checks the field values on EntitlementExclusion with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *EntitlementExclusion) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on EntitlementExclusion with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// EntitlementExclusionMultiError, or nil if none found.
+func (m *EntitlementExclusion) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *EntitlementExclusion) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Entitlement
+
+	// no validation rules for Reason
+
+	if len(errors) > 0 {
+		return EntitlementExclusionMultiError(errors)
+	}
+
+	return nil
+}
+
+// EntitlementExclusionMultiError is an error wrapping multiple validation
+// errors returned by EntitlementExclusion.ValidateAll() if the designated
+// constraints aren't met.
+type EntitlementExclusionMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m EntitlementExclusionMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m EntitlementExclusionMultiError) AllErrors() []error { return m }
+
+// EntitlementExclusionValidationError is the validation error returned by
+// EntitlementExclusion.Validate if the designated constraints aren't met.
+type EntitlementExclusionValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e EntitlementExclusionValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e EntitlementExclusionValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e EntitlementExclusionValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e EntitlementExclusionValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e EntitlementExclusionValidationError) ErrorName() string {
+	return "EntitlementExclusionValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e EntitlementExclusionValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sEntitlementExclusion.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = EntitlementExclusionValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = EntitlementExclusionValidationError{}
 
 // Validate checks the field values on Queue with the rules defined in the
 // proto definition for this message. If any rules are violated, the first
@@ -367,6 +509,35 @@ func (m *Queue) validate(all bool) error {
 		}
 	}
 
+	if all {
+		switch v := interface{}(m.GetAuthorship()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, QueueValidationError{
+					field:  "Authorship",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, QueueValidationError{
+					field:  "Authorship",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetAuthorship()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return QueueValidationError{
+				field:  "Authorship",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
 	if len(errors) > 0 {
 		return QueueMultiError(errors)
 	}
@@ -477,6 +648,76 @@ func (m *QueueSpec) validate(all bool) error {
 	// no validation rules for Fairness
 
 	// no validation rules for ClusterPoolName
+
+	for idx, item := range m.GetMaxResources() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, QueueSpecValidationError{
+						field:  fmt.Sprintf("MaxResources[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, QueueSpecValidationError{
+						field:  fmt.Sprintf("MaxResources[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return QueueSpecValidationError{
+					field:  fmt.Sprintf("MaxResources[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	for idx, item := range m.GetMaxAccelerators() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, QueueSpecValidationError{
+						field:  fmt.Sprintf("MaxAccelerators[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, QueueSpecValidationError{
+						field:  fmt.Sprintf("MaxAccelerators[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return QueueSpecValidationError{
+					field:  fmt.Sprintf("MaxAccelerators[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	// no validation rules for Scheduling
 
 	if len(errors) > 0 {
 		return QueueSpecMultiError(errors)
@@ -639,6 +880,244 @@ func (m *QueueMetrics) validate(all bool) error {
 				cause:  err,
 			}
 		}
+	}
+
+	for idx, item := range m.GetInFlightResources() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, QueueMetricsValidationError{
+						field:  fmt.Sprintf("InFlightResources[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, QueueMetricsValidationError{
+						field:  fmt.Sprintf("InFlightResources[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return QueueMetricsValidationError{
+					field:  fmt.Sprintf("InFlightResources[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	for idx, item := range m.GetMaxResources() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, QueueMetricsValidationError{
+						field:  fmt.Sprintf("MaxResources[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, QueueMetricsValidationError{
+						field:  fmt.Sprintf("MaxResources[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return QueueMetricsValidationError{
+					field:  fmt.Sprintf("MaxResources[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	// no validation rules for Scheduling
+
+	// no validation rules for HeadBlocked
+
+	if all {
+		switch v := interface{}(m.GetHeadBlockedSince()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, QueueMetricsValidationError{
+					field:  "HeadBlockedSince",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, QueueMetricsValidationError{
+					field:  "HeadBlockedSince",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetHeadBlockedSince()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return QueueMetricsValidationError{
+				field:  "HeadBlockedSince",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if all {
+		switch v := interface{}(m.GetHeadBlockedAction()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, QueueMetricsValidationError{
+					field:  "HeadBlockedAction",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, QueueMetricsValidationError{
+					field:  "HeadBlockedAction",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetHeadBlockedAction()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return QueueMetricsValidationError{
+				field:  "HeadBlockedAction",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	// no validation rules for HeadBlockedReason
+
+	for idx, item := range m.GetHeadBlockedDemand() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, QueueMetricsValidationError{
+						field:  fmt.Sprintf("HeadBlockedDemand[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, QueueMetricsValidationError{
+						field:  fmt.Sprintf("HeadBlockedDemand[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return QueueMetricsValidationError{
+					field:  fmt.Sprintf("HeadBlockedDemand[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	for idx, item := range m.GetInFlightAccelerators() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, QueueMetricsValidationError{
+						field:  fmt.Sprintf("InFlightAccelerators[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, QueueMetricsValidationError{
+						field:  fmt.Sprintf("InFlightAccelerators[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return QueueMetricsValidationError{
+					field:  fmt.Sprintf("InFlightAccelerators[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	for idx, item := range m.GetMaxAccelerators() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, QueueMetricsValidationError{
+						field:  fmt.Sprintf("MaxAccelerators[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, QueueMetricsValidationError{
+						field:  fmt.Sprintf("MaxAccelerators[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return QueueMetricsValidationError{
+					field:  fmt.Sprintf("MaxAccelerators[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	if m.WaitingActions != nil {
+		// no validation rules for WaitingActions
 	}
 
 	if len(errors) > 0 {
@@ -1560,6 +2039,404 @@ var _ interface {
 	ErrorName() string
 } = GetQueueResponseValidationError{}
 
+// Validate checks the field values on GetQueueNodeGroupsRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *GetQueueNodeGroupsRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on GetQueueNodeGroupsRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// GetQueueNodeGroupsRequestMultiError, or nil if none found.
+func (m *GetQueueNodeGroupsRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *GetQueueNodeGroupsRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetId()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, GetQueueNodeGroupsRequestValidationError{
+					field:  "Id",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, GetQueueNodeGroupsRequestValidationError{
+					field:  "Id",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetId()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return GetQueueNodeGroupsRequestValidationError{
+				field:  "Id",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return GetQueueNodeGroupsRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// GetQueueNodeGroupsRequestMultiError is an error wrapping multiple validation
+// errors returned by GetQueueNodeGroupsRequest.ValidateAll() if the
+// designated constraints aren't met.
+type GetQueueNodeGroupsRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m GetQueueNodeGroupsRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m GetQueueNodeGroupsRequestMultiError) AllErrors() []error { return m }
+
+// GetQueueNodeGroupsRequestValidationError is the validation error returned by
+// GetQueueNodeGroupsRequest.Validate if the designated constraints aren't met.
+type GetQueueNodeGroupsRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e GetQueueNodeGroupsRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e GetQueueNodeGroupsRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e GetQueueNodeGroupsRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e GetQueueNodeGroupsRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e GetQueueNodeGroupsRequestValidationError) ErrorName() string {
+	return "GetQueueNodeGroupsRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e GetQueueNodeGroupsRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sGetQueueNodeGroupsRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = GetQueueNodeGroupsRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = GetQueueNodeGroupsRequestValidationError{}
+
+// Validate checks the field values on QueueNodeGroup with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *QueueNodeGroup) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on QueueNodeGroup with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in QueueNodeGroupMultiError,
+// or nil if none found.
+func (m *QueueNodeGroup) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *QueueNodeGroup) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Cluster
+
+	if all {
+		switch v := interface{}(m.GetNodeGroup()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, QueueNodeGroupValidationError{
+					field:  "NodeGroup",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, QueueNodeGroupValidationError{
+					field:  "NodeGroup",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetNodeGroup()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return QueueNodeGroupValidationError{
+				field:  "NodeGroup",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return QueueNodeGroupMultiError(errors)
+	}
+
+	return nil
+}
+
+// QueueNodeGroupMultiError is an error wrapping multiple validation errors
+// returned by QueueNodeGroup.ValidateAll() if the designated constraints
+// aren't met.
+type QueueNodeGroupMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m QueueNodeGroupMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m QueueNodeGroupMultiError) AllErrors() []error { return m }
+
+// QueueNodeGroupValidationError is the validation error returned by
+// QueueNodeGroup.Validate if the designated constraints aren't met.
+type QueueNodeGroupValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e QueueNodeGroupValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e QueueNodeGroupValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e QueueNodeGroupValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e QueueNodeGroupValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e QueueNodeGroupValidationError) ErrorName() string { return "QueueNodeGroupValidationError" }
+
+// Error satisfies the builtin error interface
+func (e QueueNodeGroupValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sQueueNodeGroup.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = QueueNodeGroupValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = QueueNodeGroupValidationError{}
+
+// Validate checks the field values on GetQueueNodeGroupsResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *GetQueueNodeGroupsResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on GetQueueNodeGroupsResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// GetQueueNodeGroupsResponseMultiError, or nil if none found.
+func (m *GetQueueNodeGroupsResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *GetQueueNodeGroupsResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	for idx, item := range m.GetNodeGroups() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, GetQueueNodeGroupsResponseValidationError{
+						field:  fmt.Sprintf("NodeGroups[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, GetQueueNodeGroupsResponseValidationError{
+						field:  fmt.Sprintf("NodeGroups[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return GetQueueNodeGroupsResponseValidationError{
+					field:  fmt.Sprintf("NodeGroups[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	if len(errors) > 0 {
+		return GetQueueNodeGroupsResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// GetQueueNodeGroupsResponseMultiError is an error wrapping multiple
+// validation errors returned by GetQueueNodeGroupsResponse.ValidateAll() if
+// the designated constraints aren't met.
+type GetQueueNodeGroupsResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m GetQueueNodeGroupsResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m GetQueueNodeGroupsResponseMultiError) AllErrors() []error { return m }
+
+// GetQueueNodeGroupsResponseValidationError is the validation error returned
+// by GetQueueNodeGroupsResponse.Validate if the designated constraints aren't met.
+type GetQueueNodeGroupsResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e GetQueueNodeGroupsResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e GetQueueNodeGroupsResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e GetQueueNodeGroupsResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e GetQueueNodeGroupsResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e GetQueueNodeGroupsResponseValidationError) ErrorName() string {
+	return "GetQueueNodeGroupsResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e GetQueueNodeGroupsResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sGetQueueNodeGroupsResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = GetQueueNodeGroupsResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = GetQueueNodeGroupsResponseValidationError{}
+
 // Validate checks the field values on UpdateQueueStateRequest with the rules
 // defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
@@ -1612,6 +2489,8 @@ func (m *UpdateQueueStateRequest) validate(all bool) error {
 	}
 
 	// no validation rules for State
+
+	// no validation rules for ExpectedStateGeneration
 
 	if len(errors) > 0 {
 		return UpdateQueueStateRequestMultiError(errors)
@@ -1875,6 +2754,8 @@ func (m *DeleteQueueRequest) validate(all bool) error {
 		}
 	}
 
+	// no validation rules for ExpectedStateGeneration
+
 	if len(errors) > 0 {
 		return DeleteQueueRequestMultiError(errors)
 	}
@@ -1976,6 +2857,35 @@ func (m *DeleteQueueResponse) validate(all bool) error {
 	}
 
 	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetQueue()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, DeleteQueueResponseValidationError{
+					field:  "Queue",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, DeleteQueueResponseValidationError{
+					field:  "Queue",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetQueue()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return DeleteQueueResponseValidationError{
+				field:  "Queue",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
 
 	if len(errors) > 0 {
 		return DeleteQueueResponseMultiError(errors)
@@ -2857,6 +3767,372 @@ var _ interface {
 	ErrorName() string
 } = WatchQueueMetricsResponseValidationError{}
 
+// Validate checks the field values on OrgConcurrency with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *OrgConcurrency) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on OrgConcurrency with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in OrgConcurrencyMultiError,
+// or nil if none found.
+func (m *OrgConcurrency) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *OrgConcurrency) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for RunsInFlight
+
+	// no validation rules for ActionsInFlight
+
+	if all {
+		switch v := interface{}(m.GetObservedAt()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, OrgConcurrencyValidationError{
+					field:  "ObservedAt",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, OrgConcurrencyValidationError{
+					field:  "ObservedAt",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetObservedAt()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return OrgConcurrencyValidationError{
+				field:  "ObservedAt",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return OrgConcurrencyMultiError(errors)
+	}
+
+	return nil
+}
+
+// OrgConcurrencyMultiError is an error wrapping multiple validation errors
+// returned by OrgConcurrency.ValidateAll() if the designated constraints
+// aren't met.
+type OrgConcurrencyMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m OrgConcurrencyMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m OrgConcurrencyMultiError) AllErrors() []error { return m }
+
+// OrgConcurrencyValidationError is the validation error returned by
+// OrgConcurrency.Validate if the designated constraints aren't met.
+type OrgConcurrencyValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e OrgConcurrencyValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e OrgConcurrencyValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e OrgConcurrencyValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e OrgConcurrencyValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e OrgConcurrencyValidationError) ErrorName() string { return "OrgConcurrencyValidationError" }
+
+// Error satisfies the builtin error interface
+func (e OrgConcurrencyValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sOrgConcurrency.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = OrgConcurrencyValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = OrgConcurrencyValidationError{}
+
+// Validate checks the field values on GetOrgConcurrencyRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *GetOrgConcurrencyRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on GetOrgConcurrencyRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// GetOrgConcurrencyRequestMultiError, or nil if none found.
+func (m *GetOrgConcurrencyRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *GetOrgConcurrencyRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(errors) > 0 {
+		return GetOrgConcurrencyRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// GetOrgConcurrencyRequestMultiError is an error wrapping multiple validation
+// errors returned by GetOrgConcurrencyRequest.ValidateAll() if the designated
+// constraints aren't met.
+type GetOrgConcurrencyRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m GetOrgConcurrencyRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m GetOrgConcurrencyRequestMultiError) AllErrors() []error { return m }
+
+// GetOrgConcurrencyRequestValidationError is the validation error returned by
+// GetOrgConcurrencyRequest.Validate if the designated constraints aren't met.
+type GetOrgConcurrencyRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e GetOrgConcurrencyRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e GetOrgConcurrencyRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e GetOrgConcurrencyRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e GetOrgConcurrencyRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e GetOrgConcurrencyRequestValidationError) ErrorName() string {
+	return "GetOrgConcurrencyRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e GetOrgConcurrencyRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sGetOrgConcurrencyRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = GetOrgConcurrencyRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = GetOrgConcurrencyRequestValidationError{}
+
+// Validate checks the field values on GetOrgConcurrencyResponse with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *GetOrgConcurrencyResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on GetOrgConcurrencyResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// GetOrgConcurrencyResponseMultiError, or nil if none found.
+func (m *GetOrgConcurrencyResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *GetOrgConcurrencyResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetConcurrency()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, GetOrgConcurrencyResponseValidationError{
+					field:  "Concurrency",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, GetOrgConcurrencyResponseValidationError{
+					field:  "Concurrency",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetConcurrency()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return GetOrgConcurrencyResponseValidationError{
+				field:  "Concurrency",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return GetOrgConcurrencyResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// GetOrgConcurrencyResponseMultiError is an error wrapping multiple validation
+// errors returned by GetOrgConcurrencyResponse.ValidateAll() if the
+// designated constraints aren't met.
+type GetOrgConcurrencyResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m GetOrgConcurrencyResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m GetOrgConcurrencyResponseMultiError) AllErrors() []error { return m }
+
+// GetOrgConcurrencyResponseValidationError is the validation error returned by
+// GetOrgConcurrencyResponse.Validate if the designated constraints aren't met.
+type GetOrgConcurrencyResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e GetOrgConcurrencyResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e GetOrgConcurrencyResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e GetOrgConcurrencyResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e GetOrgConcurrencyResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e GetOrgConcurrencyResponseValidationError) ErrorName() string {
+	return "GetOrgConcurrencyResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e GetOrgConcurrencyResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sGetOrgConcurrencyResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = GetOrgConcurrencyResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = GetOrgConcurrencyResponseValidationError{}
+
 // Validate checks the field values on ResolveQueueRequest with the rules
 // defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
@@ -2882,6 +4158,8 @@ func (m *ResolveQueueRequest) validate(all bool) error {
 	// no validation rules for QueueName
 
 	// no validation rules for IncludeDeleted
+
+	// no validation rules for ExplainEntitlementExclusions
 
 	switch v := m.QueueScope.(type) {
 	case *ResolveQueueRequest_RunId:

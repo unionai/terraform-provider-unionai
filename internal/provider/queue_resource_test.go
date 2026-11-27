@@ -2,10 +2,12 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
 
+	core "github.com/flyteorg/flyte/v2/gen/go/flyteidl2/core"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
@@ -91,6 +93,7 @@ func TestQueueResource_Schema(t *testing.T) {
 	for _, attr := range []string{
 		"id", "name", "cluster_pool_name", "clusters", "run_concurrency",
 		"action_concurrency", "depth", "priority", "fairness", "drain", "state",
+		"scheduling", "max_resources",
 		"cluster_managed", "available_clusters", "created_at", "updated_at", "deleted_at",
 	} {
 		if _, ok := s.Schema.Attributes[attr]; !ok {
@@ -131,6 +134,7 @@ func TestQueueResource_Create(t *testing.T) {
 		Plan: newQueuePlan(t, queuePlanValues{
 			name: "batch", pool: "default", clusters: []string{"*"},
 			runConcurrency: 5, depth: 100, priority: "max", fairness: "round_robin",
+			scheduling: "greedy_capacity", maxResources: map[string]string{"cpu": "16", "memory": "64Gi"},
 		}),
 	}, resp)
 
@@ -160,6 +164,20 @@ func TestQueueResource_Create(t *testing.T) {
 	}
 	if spec.GetFairness() != queue.FairnessAlgorithm_FAIRNESS_ALGORITHM_ROUND_ROBIN {
 		t.Errorf("expected ROUND_ROBIN, got %v", spec.GetFairness())
+	}
+	if spec.GetScheduling() != queue.SchedulingAlgorithm_SCHEDULING_ALGORITHM_GREEDY_CAPACITY {
+		t.Errorf("expected GREEDY_CAPACITY, got %v", spec.GetScheduling())
+	}
+	if len(spec.GetMaxResources()) != 2 {
+		t.Errorf("expected two resource caps, got %v", spec.GetMaxResources())
+	} else {
+		caps := make(map[core.Resources_ResourceName]string, len(spec.GetMaxResources()))
+		for _, cap := range spec.GetMaxResources() {
+			caps[cap.GetName()] = cap.GetValue()
+		}
+		if caps[core.Resources_CPU] != "16" || caps[core.Resources_MEMORY] != "64Gi" {
+			t.Errorf("unexpected resource caps: %v", caps)
+		}
 	}
 	if spec.GetClusterPoolName() != "default" {
 		t.Errorf("expected cluster pool 'default', got %q", spec.GetClusterPoolName())
@@ -239,6 +257,35 @@ func TestQueueResource_CreateRejectsBadEnum(t *testing.T) {
 
 	if !resp.Diagnostics.HasError() {
 		t.Fatal("expected an error for an unknown priority")
+	}
+}
+
+func TestQueueResource_CreateRejectsBlankOrPaddedResourceQuantity(t *testing.T) {
+	for _, invalid := range []string{"", " ", " 16", "16 "} {
+		t.Run(fmt.Sprintf("%q", invalid), func(t *testing.T) {
+			r := &QueueResource{
+				org: "acme",
+				conn: &mockQueueClient{
+					createFn: func(ctx context.Context, req *queue.CreateQueueRequest) (*queue.CreateQueueResponse, error) {
+						t.Fatal("CreateQueue should not be called when a resource quantity is invalid")
+						return nil, nil
+					},
+				},
+			}
+
+			resp := &resource.CreateResponse{State: tfsdk.State{Schema: queueSchema(t).Schema}}
+			r.Create(context.Background(), resource.CreateRequest{
+				Plan: newQueuePlan(t, queuePlanValues{
+					name: "batch", pool: "default", clusters: []string{"*"},
+					priority: "medium", fairness: "round_robin",
+					maxResources: map[string]string{"cpu": invalid},
+				}),
+			}, resp)
+
+			if !resp.Diagnostics.HasError() {
+				t.Fatal("expected an error for a blank or padded resource quantity")
+			}
+		})
 	}
 }
 
@@ -675,6 +722,31 @@ func TestQueueEnumRoundTrip(t *testing.T) {
 	}
 }
 
+func TestQueueSchedulingValuesAreCanonical(t *testing.T) {
+	for _, tc := range []struct {
+		in  string
+		out queue.SchedulingAlgorithm
+	}{
+		{"default", queue.SchedulingAlgorithm_SCHEDULING_ALGORITHM_UNSPECIFIED},
+		{"strict_fifo", queue.SchedulingAlgorithm_SCHEDULING_ALGORITHM_STRICT_FIFO},
+		{"greedy_capacity", queue.SchedulingAlgorithm_SCHEDULING_ALGORITHM_GREEDY_CAPACITY},
+	} {
+		got, ok := queueSchedulingFromString(tc.in)
+		if !ok || got != tc.out {
+			t.Errorf("queueSchedulingFromString(%q) = %v, %v", tc.in, got, ok)
+		}
+		if back := queueSchedulingToTerraform(got); back.ValueString() != tc.in {
+			t.Errorf("round trip for %q produced %q", tc.in, back.ValueString())
+		}
+	}
+
+	for _, invalid := range []string{"unspecified", "STRICT_FIFO", "GREEDY_CAPACITY", "DEFAULT", "Strict_Fifo"} {
+		if got, ok := queueSchedulingFromString(invalid); ok {
+			t.Errorf("queueSchedulingFromString(%q) unexpectedly accepted %v", invalid, got)
+		}
+	}
+}
+
 // --- helpers -------------------------------------------------------------
 
 func queueSchema(t *testing.T) resource.SchemaResponse {
@@ -697,6 +769,8 @@ func queueObjectType() tftypes.Object {
 			"depth":              tftypes.Number,
 			"priority":           tftypes.String,
 			"fairness":           tftypes.String,
+			"scheduling":         tftypes.String,
+			"max_resources":      tftypes.Map{ElementType: tftypes.String},
 			"drain":              tftypes.Bool,
 			"state":              tftypes.String,
 			"cluster_managed":    tftypes.Bool,
@@ -717,6 +791,8 @@ type queuePlanValues struct {
 	depth             int64
 	priority          string
 	fairness          string
+	scheduling        string
+	maxResources      map[string]string
 	drain             bool
 }
 
@@ -726,6 +802,21 @@ func stringSetValue(items []string) tftypes.Value {
 		vals = append(vals, tftypes.NewValue(tftypes.String, c))
 	}
 	return tftypes.NewValue(tftypes.Set{ElementType: tftypes.String}, vals)
+}
+
+func stringMapValue(items map[string]string) tftypes.Value {
+	values := make(map[string]tftypes.Value, len(items))
+	for key, value := range items {
+		values[key] = tftypes.NewValue(tftypes.String, value)
+	}
+	return tftypes.NewValue(tftypes.Map{ElementType: tftypes.String}, values)
+}
+
+func schedulingOrDefault(value string) string {
+	if value == "" {
+		return "default"
+	}
+	return value
 }
 
 func newQueuePlan(t *testing.T, v queuePlanValues) tfsdk.Plan {
@@ -742,6 +833,8 @@ func newQueuePlan(t *testing.T, v queuePlanValues) tfsdk.Plan {
 			"depth":              tftypes.NewValue(tftypes.Number, v.depth),
 			"priority":           tftypes.NewValue(tftypes.String, v.priority),
 			"fairness":           tftypes.NewValue(tftypes.String, v.fairness),
+			"scheduling":         tftypes.NewValue(tftypes.String, schedulingOrDefault(v.scheduling)),
+			"max_resources":      stringMapValue(v.maxResources),
 			"drain":              tftypes.NewValue(tftypes.Bool, v.drain),
 			"state":              tftypes.NewValue(tftypes.String, nil),
 			"cluster_managed":    tftypes.NewValue(tftypes.Bool, nil),
@@ -782,6 +875,8 @@ func newQueueStateWithPoolStateDrain(t *testing.T, name, pool, state string, clu
 			"depth":              tftypes.NewValue(tftypes.Number, 100),
 			"priority":           tftypes.NewValue(tftypes.String, "max"),
 			"fairness":           tftypes.NewValue(tftypes.String, "round_robin"),
+			"scheduling":         tftypes.NewValue(tftypes.String, "default"),
+			"max_resources":      stringMapValue(map[string]string{}),
 			"drain":              tftypes.NewValue(tftypes.Bool, drain),
 			"state":              tftypes.NewValue(tftypes.String, state),
 			"cluster_managed":    tftypes.NewValue(tftypes.Bool, clusterManaged),

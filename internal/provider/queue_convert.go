@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	core "github.com/flyteorg/flyte/v2/gen/go/flyteidl2/core"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -28,9 +29,10 @@ const queueNameReservedNote = "Its name remains reserved, so a later apply of th
 	"\"already exists\" error — use `terraform import` to adopt it again."
 
 const (
-	priorityPrefix = "PRIORITY_"
-	fairnessPrefix = "FAIRNESS_ALGORITHM_"
-	statePrefix    = "QUEUE_STATE_"
+	priorityPrefix   = "PRIORITY_"
+	fairnessPrefix   = "FAIRNESS_ALGORITHM_"
+	statePrefix      = "QUEUE_STATE_"
+	schedulingPrefix = "SCHEDULING_ALGORITHM_"
 )
 
 // The provider spells enums as lowercase, prefix-stripped strings, matching how roles spell
@@ -52,6 +54,19 @@ func queueFairnessFromString(s string) (queue.FairnessAlgorithm, bool) {
 	return queue.FairnessAlgorithm(v), true
 }
 
+func queueSchedulingFromString(s string) (queue.SchedulingAlgorithm, bool) {
+	switch s {
+	case "default":
+		return queue.SchedulingAlgorithm_SCHEDULING_ALGORITHM_UNSPECIFIED, true
+	case "strict_fifo":
+		return queue.SchedulingAlgorithm_SCHEDULING_ALGORITHM_STRICT_FIFO, true
+	case "greedy_capacity":
+		return queue.SchedulingAlgorithm_SCHEDULING_ALGORITHM_GREEDY_CAPACITY, true
+	default:
+		return queue.SchedulingAlgorithm_SCHEDULING_ALGORITHM_UNSPECIFIED, false
+	}
+}
+
 // enumToTerraform strips the given prefix and lowercases an enum name. Unspecified and
 // unrecognized values become null rather than an empty string.
 func enumToTerraform(name string, prefix string) types.String {
@@ -67,6 +82,33 @@ func queuePriorityToTerraform(p queue.Priority) types.String {
 
 func queueFairnessToTerraform(f queue.FairnessAlgorithm) types.String {
 	return enumToTerraform(queue.FairnessAlgorithm_name[int32(f)], fairnessPrefix)
+}
+
+func queueSchedulingToTerraform(s queue.SchedulingAlgorithm) types.String {
+	if s == queue.SchedulingAlgorithm_SCHEDULING_ALGORITHM_UNSPECIFIED {
+		return types.StringValue("default")
+	}
+	return enumToTerraform(queue.SchedulingAlgorithm_name[int32(s)], schedulingPrefix)
+}
+
+func queueMaxResourcesToTerraform(ctx context.Context, entries []*core.Resources_ResourceEntry) (types.Map, diag.Diagnostics) {
+	resources := make(map[string]string, len(entries))
+	for _, entry := range entries {
+		var name string
+		switch entry.GetName() {
+		case core.Resources_CPU:
+			name = "cpu"
+		case core.Resources_MEMORY:
+			name = "memory"
+		case core.Resources_EPHEMERAL_STORAGE:
+			name = "ephemeral_storage"
+		default:
+			// Unknown resource names are ignored by the UI as well; GPUs are separately capped.
+			continue
+		}
+		resources[name] = entry.GetValue()
+	}
+	return types.MapValueFrom(ctx, types.StringType, resources)
 }
 
 func queueStateToTerraform(s queue.QueueState) types.String {
@@ -121,6 +163,15 @@ func buildQueueSpec(ctx context.Context, data *QueueResourceModel) (*queue.Queue
 		)
 	}
 
+	scheduling, ok := queueSchedulingFromString(data.Scheduling.ValueString())
+	if !ok {
+		diags.AddAttributeError(
+			path.Root("scheduling"),
+			"Invalid scheduling policy",
+			fmt.Sprintf("Unknown queue scheduling policy %q. Valid values are: default, strict_fifo, greedy_capacity.", data.Scheduling.ValueString()),
+		)
+	}
+
 	var clusters []string
 	if !data.Clusters.IsNull() && !data.Clusters.IsUnknown() {
 		diags.Append(data.Clusters.ElementsAs(ctx, &clusters, false)...)
@@ -136,6 +187,40 @@ func buildQueueSpec(ctx context.Context, data *QueueResourceModel) (*queue.Queue
 		}
 	}
 
+	var maxResources map[string]string
+	if !data.MaxResources.IsNull() && !data.MaxResources.IsUnknown() {
+		diags.Append(data.MaxResources.ElementsAs(ctx, &maxResources, false)...)
+	}
+	resourceNames := map[string]core.Resources_ResourceName{
+		"cpu":               core.Resources_CPU,
+		"memory":            core.Resources_MEMORY,
+		"ephemeral_storage": core.Resources_EPHEMERAL_STORAGE,
+	}
+	resourceEntries := make([]*core.Resources_ResourceEntry, 0, len(maxResources))
+	for name, value := range maxResources {
+		resourceName, valid := resourceNames[name]
+		if !valid {
+			diags.AddAttributeError(
+				path.Root("max_resources"),
+				"Invalid resource cap name",
+				fmt.Sprintf("Unknown max_resources key %q. Valid keys are: cpu, memory, ephemeral_storage.", name),
+			)
+			continue
+		}
+		if value == "" || strings.TrimSpace(value) != value {
+			diags.AddAttributeError(
+				path.Root("max_resources").AtMapKey(name),
+				"Invalid resource quantity",
+				fmt.Sprintf("max_resources[%q] must not be blank or have leading or trailing whitespace. Provide a Kubernetes quantity such as %q.", name, "16"),
+			)
+			continue
+		}
+		resourceEntries = append(resourceEntries, &core.Resources_ResourceEntry{
+			Name:  resourceName,
+			Value: value,
+		})
+	}
+
 	if diags.HasError() {
 		return nil, diags
 	}
@@ -146,6 +231,8 @@ func buildQueueSpec(ctx context.Context, data *QueueResourceModel) (*queue.Queue
 		Depth:             depth,
 		Priority:          priority,
 		Fairness:          fairness,
+		Scheduling:        scheduling,
+		MaxResources:      resourceEntries,
 		Clusters:          clusters,
 		ClusterPoolName:   data.ClusterPoolName.ValueString(),
 	}, diags
@@ -172,6 +259,26 @@ func applyQueueToModel(data *QueueResourceModel, q *queue.Queue) diag.Diagnostic
 	data.Depth = types.Int64Value(int64(spec.GetDepth()))
 	data.Priority = queuePriorityToTerraform(spec.GetPriority())
 	data.Fairness = queueFairnessToTerraform(spec.GetFairness())
+	data.Scheduling = queueSchedulingToTerraform(spec.GetScheduling())
+	maxResources := make(map[string]string, len(spec.GetMaxResources()))
+	for _, entry := range spec.GetMaxResources() {
+		var name string
+		switch entry.GetName() {
+		case core.Resources_CPU:
+			name = "cpu"
+		case core.Resources_MEMORY:
+			name = "memory"
+		case core.Resources_EPHEMERAL_STORAGE:
+			name = "ephemeral_storage"
+		default:
+			// Unknown fields are ignored by the UI as well; GPUs are separately capped.
+			continue
+		}
+		maxResources[name] = entry.GetValue()
+	}
+	var mapDiags diag.Diagnostics
+	data.MaxResources, mapDiags = types.MapValueFrom(context.Background(), types.StringType, maxResources)
+	diags.Append(mapDiags...)
 	if data.Drain.IsNull() || data.Drain.IsUnknown() {
 		data.Drain = types.BoolValue(false)
 	}
