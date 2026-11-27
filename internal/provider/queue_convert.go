@@ -207,12 +207,17 @@ func buildQueueSpec(ctx context.Context, data *QueueResourceModel) (*queue.Queue
 			)
 			continue
 		}
-		if strings.TrimSpace(value) == "" {
+		if value == "" || strings.TrimSpace(value) != value {
+			diags.AddAttributeError(
+				path.Root("max_resources").AtMapKey(name),
+				"Invalid resource quantity",
+				fmt.Sprintf("max_resources[%q] must not be blank or have leading or trailing whitespace. Provide a Kubernetes quantity such as %q.", name, "16"),
+			)
 			continue
 		}
 		resourceEntries = append(resourceEntries, &core.Resources_ResourceEntry{
 			Name:  resourceName,
-			Value: strings.TrimSpace(value),
+			Value: value,
 		})
 	}
 

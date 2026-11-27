@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -256,6 +257,35 @@ func TestQueueResource_CreateRejectsBadEnum(t *testing.T) {
 
 	if !resp.Diagnostics.HasError() {
 		t.Fatal("expected an error for an unknown priority")
+	}
+}
+
+func TestQueueResource_CreateRejectsBlankOrPaddedResourceQuantity(t *testing.T) {
+	for _, invalid := range []string{"", " ", " 16", "16 "} {
+		t.Run(fmt.Sprintf("%q", invalid), func(t *testing.T) {
+			r := &QueueResource{
+				org: "acme",
+				conn: &mockQueueClient{
+					createFn: func(ctx context.Context, req *queue.CreateQueueRequest) (*queue.CreateQueueResponse, error) {
+						t.Fatal("CreateQueue should not be called when a resource quantity is invalid")
+						return nil, nil
+					},
+				},
+			}
+
+			resp := &resource.CreateResponse{State: tfsdk.State{Schema: queueSchema(t).Schema}}
+			r.Create(context.Background(), resource.CreateRequest{
+				Plan: newQueuePlan(t, queuePlanValues{
+					name: "batch", pool: "default", clusters: []string{"*"},
+					priority: "medium", fairness: "round_robin",
+					maxResources: map[string]string{"cpu": invalid},
+				}),
+			}, resp)
+
+			if !resp.Diagnostics.HasError() {
+				t.Fatal("expected an error for a blank or padded resource quantity")
+			}
+		})
 	}
 }
 
