@@ -95,7 +95,13 @@ resource "unionai_queue" "production" {
 - `priority` (String) Scheduling priority relative to other queues: `min`, `medium` (the default), or `max`. Scheduling is strict — `max` always runs before `medium`, which always runs before `min`.
 - `fairness` (String) Cross-project scheduling policy within this queue: `round_robin` (the default) or `shuffle_interleave`. The unit of fairness is per-project.
 - `scheduling` (String) Policy for scheduling actions that do not fit the remaining `max_resources` caps: `default` (the default), `strict_fifo`, or `greedy_capacity`. `default` follows the fairness order and skips actions that do not fit; `strict_fifo` visits actions in enqueue order and blocks later actions behind the first one that does not fit; `greedy_capacity` visits actions in enqueue order and continues past actions that do not fit.
-- `max_resources` (Map of String) Caps the sum of resource requests from this queue's in-flight actions. Supported keys are `cpu`, `memory`, and `ephemeral_storage`; values are Kubernetes quantities such as `64`, `1500m`, `512Gi`, or `1Ti`. Omit a key to leave that resource unlimited. GPUs are not supported in this map; queue resource caps in the UI also apply to CPU, memory, and ephemeral storage.
+- `max_resources` (Map of String) Caps the sum of resource requests from this queue's in-flight actions. Supported keys are `cpu`, `memory`, and `ephemeral_storage`; values are Kubernetes quantities such as `64`, `1500m`, `512Gi`, or `1Ti`. If the entire attribute is omitted, existing caps are preserved; a newly created queue starts without caps. Set `max_resources = {}` to clear all caps. When a map is provided, any omitted key is unlimited. GPUs are not supported in this map; queue resource caps in the UI also apply to CPU, memory, and ephemeral storage.
+
+For example, to remove all caps from an existing queue, configure:
+
+```terraform
+max_resources = {}
+```
 - `drain` (Boolean) When true, request that the queue stop accepting new work and drain existing work. Use this before destroying a queue. Defaults to `false`.
 
 Resource caps and scheduling behavior are enforced by the `v2` and `v3` scheduler strategies. With the default `v1` strategy, the configured cap is recorded but does not change scheduling decisions.

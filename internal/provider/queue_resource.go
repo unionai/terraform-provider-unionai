@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -129,10 +130,13 @@ func (r *QueueResource) Schema(ctx context.Context, req resource.SchemaRequest, 
 				MarkdownDescription: "Scheduling policy used when an action does not fit the queue's remaining resource caps: `default`, `strict_fifo`, or `greedy_capacity`. `default` keeps the configured fairness order and skips actions that do not fit; `strict_fifo` holds the queue behind the first action that does not fit; `greedy_capacity` skips non-fitting actions and continues dispatching later actions.",
 			},
 			"max_resources": schema.MapAttribute{
-				Optional:            true,
-				Computed:            true,
-				ElementType:         types.StringType,
-				MarkdownDescription: "Per-resource caps on the total requests of this queue's in-flight actions. Supported keys are `cpu`, `memory`, and `ephemeral_storage`; values use Kubernetes quantity syntax such as `64`, `1500m`, or `512Gi`. Omit a key to leave that resource unlimited. GPUs are not accepted here.",
+				Optional:    true,
+				Computed:    true,
+				ElementType: types.StringType,
+				PlanModifiers: []planmodifier.Map{
+					mapplanmodifier.UseStateForUnknown(),
+				},
+				MarkdownDescription: "Per-resource caps on the total requests of this queue's in-flight actions. Supported keys are `cpu`, `memory`, and `ephemeral_storage`; values use Kubernetes quantity syntax such as `64`, `1500m`, or `512Gi`. If this attribute is omitted, existing caps are preserved; on creation, no caps are set. Set it to `{}` to clear all caps. When providing a map, omitted keys are unlimited. GPUs are not accepted here.",
 			},
 			"drain": schema.BoolAttribute{
 				Optional:            true,
